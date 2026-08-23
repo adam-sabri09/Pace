@@ -4,11 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 import { logOutAction } from "@/server/actions/auth";
 
 /**
- * /today — placeholder authenticated landing.
+ * /today — authenticated landing.
  *
- * Step 3 scope: prove the auth round-trip works end-to-end. Real dashboard
- * content (session cards, exam widget, nav shell) is built in Step 5.
- * Keep this file intentionally minimal so it doesn't collect UI debt.
+ * Redirect matrix:
+ *   - not signed in       → /login
+ *   - not onboarded yet   → /onboarding  (session_length_minutes IS NULL)
+ *   - onboarded, no plan  → the "all clear" empty state below
+ *
+ * A real dashboard (session cards, up-next tile, exam widget, nav shell)
+ * lands in Step 5. This file stays intentionally minimal until then.
  */
 export default async function TodayPage() {
   const supabase = await createClient();
@@ -19,9 +23,11 @@ export default async function TodayPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("first_name")
+    .select("first_name, session_length_minutes")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (profile?.session_length_minutes == null) redirect("/onboarding");
 
   const greetingName = profile?.first_name?.trim() || "friend";
 
@@ -30,12 +36,27 @@ export default async function TodayPage() {
       <div className="w-full max-w-md flex flex-col items-center gap-stack-md text-center">
         <span className="font-display text-headline-md text-primary">Pace</span>
         <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-on-surface">
-          You&rsquo;re signed in, {greetingName}.
+          You&rsquo;re all set, {greetingName}.
         </h1>
-        <p className="font-body-md text-body-md text-on-surface-variant">
-          Your dashboard is coming next. This is the placeholder landing that
-          confirms your account works.
-        </p>
+        {/* "All clear" empty state (DESIGN-SPEC.md §3.11) — the plan generator
+            is Step 8; until then a signed-in, onboarded user sees this. */}
+        <div className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-lg flex flex-col items-center gap-stack-sm">
+          <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center">
+            <span
+              className="material-symbols-outlined text-3xl text-secondary"
+              style={{ fontVariationSettings: "'wght' 300" }}
+            >
+              check_circle
+            </span>
+          </div>
+          <h2 className="font-headline-md text-headline-md text-on-surface">
+            Your plan is coming.
+          </h2>
+          <p className="font-body-md text-body-md text-on-surface-variant max-w-sm">
+            Onboarding done. The plan generator lands next — this is where your
+            day-by-day sessions will appear.
+          </p>
+        </div>
         <form action={logOutAction}>
           <button
             type="submit"
