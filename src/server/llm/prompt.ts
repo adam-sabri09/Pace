@@ -1,0 +1,88 @@
+import type { PlanInput } from "./schema";
+import { utcToLocalParts } from "./time";
+
+/**
+ * Build the prompt Gemini receives. Pure function of PlanInput — no
+ * side effects, easily unit-testable.
+ */
+export function buildPrompt(input: PlanInput): string {
+  const nowLocal = utcToLocalParts(input.now, input.timeZone);
+  const nowStr = `${nowLocal.dateString} ${nowLocal.timeString} local`;
+
+  const subjectBlock = input.subjects
+    .map((s) => {
+      const topics = s.topics.map((t) => `    - ${t.name}`).join("\n");
+      const exam = s.examDate ? ` (exam: ${s.examDate})` : " (no exam date set)";
+      return `  * ${s.name}${exam}\n${topics}`;
+    })
+    .join("\n");
+
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const availabilityByDay = new Map<number, string[]>();
+  for (const w of input.availability) {
+    const list = availabilityByDay.get(w.dayOfWeek) ?? [];
+    list.push(`${w.startsAt}–${w.endsAt}`);
+    availabilityByDay.set(w.dayOfWeek, list);
+  }
+  const availabilityBlock = days
+    .map((label, i) => {
+      const windows = availabilityByDay.get(i);
+      return `  - ${label}: ${windows ? windows.join(", ") : "(unavailable)"}`;
+    })
+    .join("\n");
+
+  const completedBlock =
+    input.completedSessions && input.completedSessions.length > 0
+      ? "\nAlready-completed sessions (do not schedule these again):\n" +
+        input.completedSessions
+          .map(
+            (c) =>
+              `  - ${c.startsAt} · ${c.subjectName} · ${c.topicName} · ${c.durationMinutes} min`,
+          )
+          .join("\n")
+      : "";
+
+  return `You are Pace, an adaptive study planner for high-school students.
+Build a realistic, day-by-day study schedule.
+
+Student's timezone: ${input.timeZone}
+Right now: ${nowStr}
+Fixed session length: ${input.sessionLengthMinutes} minutes (every session must be exactly this)
+
+Subjects and topics:
+${subjectBlock}
+
+Weekly availability windows (student's local time):
+${availabilityBlock}
+${completedBlock}
+
+Rules:
+1. Every session's startsAt is a local wall-clock string in the student's
+   timezone, formatted YYYY-MM-DDTHH:MM (no offset, no seconds).
+2. Every session's durationMinutes must be exactly ${input.sessionLengthMinutes}.
+3. Every session must fit entirely inside one availability window on the
+   correct day of week — no session crosses a window boundary.
+4. Leave at least a 5-minute gap between consecutive same-day sessions
+   (implicit break; do not schedule a "break" session).
+5. Sessions must not overlap.
+6. Schedule sessions between "right now" and each subject's exam date.
+   Prioritise topics whose subject has a nearer exam date; if a subject
+   has no exam date, distribute its topics gently through the whole plan.
+7. If a topic cannot fit before its exam date given the availability,
+   include a warning object with subjectName, topicName, and a short
+   message. Never silently drop a topic.
+8. subjectName must exactly match one of the subject names above.
+   topicName must exactly match a topic listed under that subject.
+9. instruction is a short (<= 60 chars) action label for the student,
+   e.g. "Review chapter 4", "Practice problems", "Active recall".
+
+Return a JSON object matching the schema.`;
+}
