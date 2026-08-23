@@ -34,7 +34,10 @@ jobs:
         if: steps.detect.outputs.present == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Sourced from .nvmrc so CI, local dev, and Vercel all track the
+          # same major. Must be >= 22.19 for jsdom 30 / undici 8 (used by
+          # the component tests); Node 20 lacks worker_threads.markAsUncloneable.
+          node-version-file: ".nvmrc"
           cache: npm
 
       - name: Install dependencies

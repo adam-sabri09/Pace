@@ -3,13 +3,33 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   test: {
-    environment: "node",
-    include: ["src/tests/**/*.test.ts"],
-    passWithNoTests: false,
-  },
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
+    // .tsx tests get jsdom (React Testing Library); .ts tests stay on node.
+    projects: [
+      {
+        test: {
+          name: "unit",
+          environment: "node",
+          include: ["src/tests/**/*.test.ts"],
+        },
+        resolve: {
+          alias: {
+            "@": fileURLToPath(new URL("./src", import.meta.url)),
+          },
+        },
+      },
+      {
+        test: {
+          name: "component",
+          environment: "jsdom",
+          include: ["src/tests/**/*.test.tsx"],
+          setupFiles: ["./src/tests/setup-dom.ts"],
+        },
+        resolve: {
+          alias: {
+            "@": fileURLToPath(new URL("./src", import.meta.url)),
+          },
+        },
+      },
+    ],
   },
 });
