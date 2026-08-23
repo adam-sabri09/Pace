@@ -45,34 +45,62 @@ describe("0001_init.sql", () => {
     }
   });
 
-  it("has a select policy for every user-owned table", () => {
+  it("has a select policy for every user-owned table, restricted to authenticated", () => {
     for (const table of USER_OWNED_TABLES) {
       expect(sql).toMatch(
-        new RegExp(`create policy \\w+ on public\\.${table}\\s+for select`, "i"),
+        new RegExp(
+          `create policy \\w+ on public\\.${table}\\s+for select\\s+to authenticated`,
+          "i",
+        ),
       );
     }
   });
 
-  it("has an insert policy for every user-owned table", () => {
+  it("has an insert policy for every user-owned table, restricted to authenticated", () => {
     for (const table of USER_OWNED_TABLES) {
       expect(sql).toMatch(
-        new RegExp(`create policy \\w+ on public\\.${table}\\s+for insert`, "i"),
+        new RegExp(
+          `create policy \\w+ on public\\.${table}\\s+for insert\\s+to authenticated`,
+          "i",
+        ),
       );
     }
   });
 
-  it("has an update policy for every user-owned table", () => {
+  it("has an update policy for every user-owned table with both USING and WITH CHECK", () => {
     for (const table of USER_OWNED_TABLES) {
       expect(sql).toMatch(
-        new RegExp(`create policy \\w+ on public\\.${table}\\s+for update`, "i"),
+        new RegExp(
+          `create policy \\w+ on public\\.${table}\\s+for update\\s+to authenticated\\s+using[\\s\\S]+?with check\\s*\\(`,
+          "i",
+        ),
       );
     }
   });
 
-  it("has a delete policy for every user-owned table", () => {
+  it("has a delete policy for every user-owned table, restricted to authenticated", () => {
     for (const table of USER_OWNED_TABLES) {
       expect(sql).toMatch(
-        new RegExp(`create policy \\w+ on public\\.${table}\\s+for delete`, "i"),
+        new RegExp(
+          `create policy \\w+ on public\\.${table}\\s+for delete\\s+to authenticated`,
+          "i",
+        ),
+      );
+    }
+  });
+
+  it("does NOT use the deprecated auth.role() pattern", () => {
+    expect(sql).not.toMatch(/auth\.role\s*\(\s*\)/i);
+  });
+
+  it("uses (select auth.uid()) for policy predicate caching", () => {
+    // Every user-owned table should be present in at least one policy body.
+    for (const table of USER_OWNED_TABLES) {
+      expect(sql).toMatch(
+        new RegExp(
+          `on public\\.${table}[\\s\\S]+?\\(select auth\\.uid\\(\\)\\)`,
+          "i",
+        ),
       );
     }
   });
@@ -109,6 +137,16 @@ describe("0001_init.sql", () => {
 
   it("registers the auth.users → profiles trigger", () => {
     expect(sql).toMatch(/create trigger on_auth_user_created\s+after insert on auth\.users/i);
+  });
+
+  it("revokes EXECUTE from PUBLIC on the SECURITY DEFINER trigger function", () => {
+    expect(sql).toMatch(
+      /revoke execute on function public\.handle_new_user\(\)\s+from public/i,
+    );
+  });
+
+  it("locks search_path on the SECURITY DEFINER function", () => {
+    expect(sql).toMatch(/set search_path = ''/i);
   });
 
   it("has no direct references to service_role or hardcoded secrets", () => {
