@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+/*
+ * Pace design tokens — mirrors DESIGN-SPEC.md §1 and stitch_pace_adaptive_study_planner/pace/DESIGN.md.
+ * Tailwind v4 CSS-first configuration: names below generate utilities like bg-primary-container,
+ * text-headline-lg, p-stack-md, rounded-xl, etc.
+ */
+@theme {
+  /* --- Color palette (Material 3 tonal system) --- */
+  --color-background: #fbf8ff;
+  --color-surface: #fbf8ff;
+  --color-surface-bright: #fbf8ff;
+  --color-surface-dim: #d7d8f4;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f4f2ff;
+  --color-surface-container: #edecff;
+  --color-surface-container-high: #e6e6ff;
+  --color-surface-container-highest: #e0e0fc;
+  --color-surface-variant: #e0e0fc;
+  --color-surface-tint: #45664b;
+  --color-inverse-surface: #2d2f44;
+  --color-inverse-on-surface: #f1efff;
+
+  --color-primary: #23422a;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #3a5a40;
+  --color-on-primary-container: #acd0af;
+  --color-primary-fixed: #c7ecca;
+  --color-primary-fixed-dim: #abd0af;
+  --color-on-primary-fixed: #02210c;
+  --color-on-primary-fixed-variant: #2e4e35;
+  --color-inverse-primary: #abd0af;
+
+  --color-secondary: #5c6145;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e1e6c2;
+  --color-on-secondary-container: #62674a;
+  --color-secondary-fixed: #e1e6c2;
+  --color-secondary-fixed-dim: #c5c9a7;
+  --color-on-secondary-fixed: #1a1d07;
+  --color-on-secondary-fixed-variant: #45492f;
+
+  --color-tertiary: #593038;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #73464f;
+  --color-on-tertiary-container: #f3b7c1;
+  --color-tertiary-fixed: #ffd9df;
+  --color-tertiary-fixed-dim: #f3b7c1;
+  --color-on-tertiary-fixed: #321019;
+  --color-on-tertiary-fixed-variant: #653a43;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-on-background: #181a2e;
+  --color-on-surface: #181a2e;
+  --color-on-surface-variant: #424842;
+  --color-outline: #727971;
+  --color-outline-variant: #c2c8bf;
+
+  /* --- Typography (Hanken Grotesk) --- */
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+
+  /* All font-* tokens resolve to Hanken so Stitch classes like font-display / font-label-sm still work. */
+  --font-display: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-headline-lg: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-headline-lg-mobile: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-headline-md: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-body-lg: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-body-md: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-label-md: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-label-sm: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale from DESIGN-SPEC.md §1.2 — size + line-height + weight + letter-spacing baked in. */
+  --text-display: 40px;
+  --text-display--line-height: 48px;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 600;
+
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 40px;
+  --text-headline-lg--letter-spacing: -0.01em;
+  --text-headline-lg--font-weight: 600;
+
+  --text-headline-lg-mobile: 24px;
+  --text-headline-lg-mobile--line-height: 32px;
+  --text-headline-lg-mobile--font-weight: 600;
+
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 500;
+
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body-md: 16px;
+  --text-body-md--line-height: 24px;
+  --text-body-md--font-weight: 400;
+
+  --text-label-md: 14px;
+  --text-label-md--line-height: 20px;
+  --text-label-md--letter-spacing: 0.01em;
+  --text-label-md--font-weight: 500;
+
+  --text-label-sm: 12px;
+  --text-label-sm--line-height: 16px;
+  --text-label-sm--letter-spacing: 0.04em;
+  --text-label-sm--font-weight: 600;
+
+  /* --- Spacing (8px baseline, named tokens from DESIGN-SPEC.md §1.3) --- */
+  --spacing-base: 8px;
+  --spacing-stack-sm: 12px;
+  --spacing-gutter: 16px;
+  --spacing-container-margin: 20px;
+  --spacing-stack-md: 24px;
+  --spacing-stack-lg: 40px;
+
+  /* --- Border radius (DESIGN-SPEC.md §1.4, DECISIONS.md D33) --- */
+  --radius-DEFAULT: 0.125rem; /* 2px  — tiny corners */
+  --radius-lg: 0.25rem;       /* 4px  — standard */
+  --radius-xl: 0.5rem;        /* 8px  — large containers */
+  --radius-full: 0.75rem;     /* 12px — soft-pill, NOT a real pill (per DESIGN.md prose) */
+}
+
+/* Material Symbols Outlined — icon font loaded via <link> in layout.tsx. */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+.material-symbols-outlined.filled,
+.filled-icon {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+/* Tabular numerals for the study-session timer. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Respect reduced motion (see REQUIREMENTS.md N5.3). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+}
