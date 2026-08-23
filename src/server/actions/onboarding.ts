@@ -9,6 +9,7 @@ import {
   OnboardingSchema,
   type OnboardingInput,
 } from "@/lib/validation/onboarding";
+import { generatePlanForUser } from "./plan";
 
 /**
  * commitOnboarding — persist a full wizard result and mark the user as onboarded.
@@ -127,13 +128,32 @@ export async function commitOnboardingAction(
     }
   }
 
-  // 7. Mark onboarded LAST. Anything above this line is recoverable via the
-  //    /today → /onboarding redirect heuristic.
+  // 7. Generate the plan via Gemini. This runs BEFORE we set the "onboarded"
+  //    flag — if it fails, the user's session_length_minutes stays NULL and
+  //    /onboarding is still reachable, so a retry starts fresh from the top.
+  const planResult = await generatePlanForUser(
+    supabase,
+    user.id,
+    input.sessionLengthMinutes,
+  );
+  if (!planResult.ok) {
+    await supabase
+      .from("availability_windows")
+      .delete()
+      .eq("user_id", user.id);
+    await supabase.from("subjects").delete().eq("user_id", user.id);
+    return { ok: false, error: planResult.error };
+  }
+
+  // 8. Mark onboarded LAST. Only reached after the plan is safely saved.
   const { error: profileError } = await supabase
     .from("profiles")
     .update({ session_length_minutes: input.sessionLengthMinutes })
     .eq("id", user.id);
   if (profileError) {
+    // Best-effort: also drop the plan (cascades sessions) since the profile
+    // update was our commit point.
+    await supabase.from("plans").delete().eq("user_id", user.id);
     await supabase
       .from("availability_windows")
       .delete()
