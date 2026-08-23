@@ -149,8 +149,24 @@ describe("0001_init.sql", () => {
     expect(sql).toMatch(/set search_path = ''/i);
   });
 
-  it("has no direct references to service_role or hardcoded secrets", () => {
-    expect(sql).not.toMatch(/service_role/i);
-    expect(sql).not.toMatch(/sk_live|eyJ[A-Za-z0-9]/); // JWT / secret shapes
+  it("grants the required Data API access to authenticated and service_role", () => {
+    expect(sql).toMatch(/grant usage on schema public to authenticated,\s*service_role/i);
+    expect(sql).toMatch(
+      /grant select,\s*insert,\s*update,\s*delete\s+on all tables in schema public\s+to authenticated/i,
+    );
+    expect(sql).toMatch(
+      /grant all privileges\s+on all tables in schema public\s+to service_role/i,
+    );
+  });
+
+  it("does NOT grant anon direct DML on the app tables", () => {
+    // anon must not appear as a grantee on tables/sequences — signup uses
+    // the auth endpoints, not direct table writes.
+    expect(sql).not.toMatch(/grant [^\n]* to [^;]*\banon\b/i);
+  });
+
+  it("has no hardcoded secrets", () => {
+    // JWT / secret shapes.
+    expect(sql).not.toMatch(/sk_live|eyJ[A-Za-z0-9]/);
   });
 });

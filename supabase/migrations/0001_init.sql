@@ -211,3 +211,31 @@ revoke execute on function public.handle_new_user() from public;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- =========================================================================
+-- Data API grants.
+--
+-- In some Supabase projects the "expose new tables to Data API" auto-grant
+-- is off, so tables are unreachable via PostgREST until GRANTs are added
+-- explicitly (see the Supabase skill: "Exposing tables to the Data API").
+-- We grant the two roles the application ever uses through PostgREST:
+--   - authenticated: DML permissions; RLS above restricts row visibility to
+--     the current user via TO authenticated + USING/WITH CHECK.
+--   - service_role: full privileges (still bypasses RLS as always).
+-- anon is intentionally NOT granted anything on these tables — signup goes
+-- through auth endpoints, not the tables, so anon never needs direct access.
+-- =========================================================================
+
+grant usage on schema public to authenticated, service_role;
+
+grant select, insert, update, delete
+  on all tables in schema public
+  to authenticated;
+
+grant all privileges
+  on all tables in schema public
+  to service_role;
+
+grant usage, select
+  on all sequences in schema public
+  to authenticated, service_role;
