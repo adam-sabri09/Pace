@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect Next.js project
+        id: detect
+        run: |
+          if [ -f package.json ]; then
+            echo "present=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=CI placeholder::No package.json yet. CI checks will run once Phase 4 Step 1 scaffolds the Next.js project."
+          fi
+
+      - name: Set up Node.js
+        if: steps.detect.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.detect.outputs.present == 'true'
+        run: npm ci
+
+      - name: Lint
+        if: steps.detect.outputs.present == 'true'
+        run: npm run lint
+
+      - name: Typecheck
+        if: steps.detect.outputs.present == 'true'
+        run: npx tsc --noEmit
+
+      - name: Test
+        if: steps.detect.outputs.present == 'true'
+        run: npm test -- --run
+
+      - name: Build
+        if: steps.detect.outputs.present == 'true'
+        env:
+          # Placeholder values so the build passes; real values live in Vercel env.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role
+          GOOGLE_GENERATIVE_AI_API_KEY: placeholder-gemini-key
+        run: npm run build
