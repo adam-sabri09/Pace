@@ -280,3 +280,579 @@ Per your gate system: **STOP here. I have not moved to Phase 2.** I need you to:
 3. Explicitly approve moving to Phase 2 (Product Definition / Requirements).
 
 I will not touch Phase 2 (product spec, features, architecture, coding, Git, CI/CD) until you tell me to.
+
+---
+---
+
+# Part II — Business & Systems Modelling (Pace)
+
+> **Purpose.** Part I (above) validated the *problem* and recommended a BUILD/PIVOT decision. Part II turns that validated hypothesis into the **systems** and **business** artifacts a founder/engineer needs to design, price, staff, and scale the product. It is a companion to the product docs (`PRODUCT.md`, `ARCHITECTURE.md`, `DATABASE.md`, `USER-FLOWS.md`).
+>
+> **Evidence discipline (unchanged from Part I).** Every quantitative figure in the business model below is an **ASSUMPTION / illustrative model input**, not measured data, unless it carries an inline citation from Part I. They exist so the model *runs*; treat them as dials to be replaced with real numbers after user interviews and a pricing test. Nothing here is a forecast or a promise.
+>
+> **Diagrams** are written in Mermaid and render on GitHub and most Markdown viewers.
+
+---
+
+## B0. Business Index
+
+| # | Artifact | What it answers | Section |
+|---|---|---|---|
+| 1 | Glossary | What do the domain + commercial terms mean? | [B1](#b1-glossary) |
+| 2 | Domain Class Diagram (UML) | What are the core objects and their relationships? | [B2.1](#b21-domain-class-diagram-uml) |
+| 3 | Session Lifecycle (State) | How does a study session change state? | [B2.2](#b22-session-lifecycle--state-diagram) |
+| 4 | Sequence — Onboard & Generate | How does a plan get built end-to-end? | [B2.3](#b23-sequence--signup--onboarding--plan-generation) |
+| 5 | Sequence — Adaptive Re-plan | What happens when a session is missed? | [B2.4](#b24-sequence--adaptive-re-plan-on-missed) |
+| 6 | Use-Case Overview | Who does what with the system? | [B2.5](#b25-use-case-overview) |
+| 7 | Business Relationship Diagram | Who exchanges what value with whom? | [B3.1](#b31-business-relationship-diagram-value-exchange) |
+| 8 | Conceptual ERD | High-level entities (no attributes) | [B3.2](#b32-conceptual-erd-high-level--design-level-0) |
+| 9 | Logical ERD | Normalised entities + keys, DB-agnostic | [B3.3](#b33-logical-erd-low-level--design-level-1) |
+| 10 | Physical ERD | Actual Supabase/Postgres tables + types | [B3.4](#b34-physical-erd-low-level--design-level-2) |
+| 11 | Operational Model | How the business runs day-to-day | [B4.1](#b41-operational-model) |
+| 12 | P&L / Revenue Model | How money comes in and goes out | [B4.2](#b42-pl--revenue-model) |
+| 13 | Go-to-Market × Scalability | How we acquire and grow, and what it costs | [B4.3](#b43-go-to-market--scalability) |
+
+---
+
+## B1. Glossary
+
+### Domain / product terms
+
+| Term | Definition |
+|---|---|
+| **Pace** | The product: an adaptive AI study planner for high-school students (ages ~14–18). |
+| **Adaptive re-plan** | Automatic regeneration of *future* study sessions when a session is missed or availability/subjects change. Completed and missed sessions are immutable history. |
+| **Session** | A single scheduled block of study for one topic, at a fixed length (25/45/60 min), with a short instruction (e.g. "Active recall"). |
+| **Session status** | One of `scheduled`, `completed`, `missed`. |
+| **Plan** | The active collection of a user's scheduled sessions between "now" and the last exam date. One active plan per user. |
+| **Availability window** | A recurring weekly time block (e.g. Mon 16:00–18:00) inside which sessions may be scheduled. |
+| **Warning** | A machine-generated note that a topic cannot fit before its exam given current availability (surfaced, never silently dropped). |
+| **Onboarding wizard** | The 5-step + review flow that captures subjects, topics, exam dates, availability, and session length. |
+| **Quiet Mentor** | Product/brand personality: calm, editorial, non-gamified, distraction-free. |
+| **Feasibility pre-check** | A guard that rejects impossible inputs (past/today exam date, windows shorter than the session length) with an actionable message before the LLM is called. |
+
+### Business / commercial terms
+
+| Term | Definition |
+|---|---|
+| **ICP** | Ideal Customer Profile — the specific user/buyer we optimise for (here: exam-anchored HS student; parent as payer). |
+| **Payer vs User** | The **user** is the student; the **payer** is typically the parent (family plan). A classic split-incentive market. |
+| **Freemium** | Free tier to drive adoption; paid tier unlocks the full adaptive plan / multiple subjects. |
+| **ARPU / ARPPU** | Average Revenue Per User / Per *Paying* User. |
+| **CAC** | Customer Acquisition Cost — blended cost to acquire one paying account. |
+| **LTV** | Lifetime Value — gross contribution from an account over its lifetime. |
+| **Gross margin** | Revenue minus direct cost of serving (LLM + hosting + payment fees). |
+| **Churn** | Rate at which paying accounts cancel. High in the planner category (Part I). |
+| **CM (Contribution Margin)** | Revenue per account minus variable cost per account. |
+| **GTM** | Go-To-Market — the acquisition and distribution strategy. |
+| **PLG** | Product-Led Growth — the product itself (shareable output, referrals) drives acquisition. |
+| **StudyTok** | The study-focused community on TikTok; a primary organic channel (Part I). |
+| **Seasonality** | Demand concentrated around exam windows (e.g. UK GCSE/A-Level May–June; US AP May). |
+
+---
+
+## B2. UML & Sequence Diagrams
+
+### B2.1 Domain Class Diagram (UML)
+
+The core objects and their multiplicities. Mirrors `DATABASE.md`; behaviour (methods) shown at the level of the server actions.
+
+```mermaid
+classDiagram
+    class Profile {
+        +uuid id
+        +string firstName
+        +bool ageConfirmed13Plus
+        +int sessionLengthMinutes
+        +string timeZone
+    }
+    class Subject {
+        +uuid id
+        +string name
+        +date examDate
+    }
+    class Topic {
+        +uuid id
+        +string name
+    }
+    class AvailabilityWindow {
+        +int dayOfWeek
+        +time startsAt
+        +time endsAt
+    }
+    class Plan {
+        +uuid id
+        +bool isActive
+        +datetime lastReplannedAt
+        +json warnings
+    }
+    class Session {
+        +uuid id
+        +datetime startsAt
+        +int durationMinutes
+        +string instruction
+        +Status status
+        +complete()
+        +miss()
+    }
+    class Planner {
+        <<service>>
+        +generatePlan()
+        +rePlan()
+        +checkFeasibility()
+    }
+
+    Profile "1" --> "0..*" Subject : owns
+    Profile "1" --> "0..*" AvailabilityWindow : sets
+    Subject "1" --> "1..*" Topic : contains
+    Profile "1" --> "0..1" Plan : has active
+    Plan "1" --> "0..*" Session : schedules
+    Topic "1" --> "0..*" Session : studied in
+    Planner ..> Plan : produces
+    Planner ..> Session : validates
+```
+
+### B2.2 Session Lifecycle — State Diagram
+
+```mermaid
+stateDiagram-v2
+    [*] --> scheduled : plan generated
+    scheduled --> completed : mark Complete
+    scheduled --> missed : mark Missed
+    missed --> [*] : kept as history (immutable)
+    completed --> [*] : kept as history (immutable)
+    note right of missed
+        Marking Missed triggers an
+        adaptive re-plan of the
+        remaining scheduled sessions.
+    end note
+```
+
+### B2.3 Sequence — Signup → Onboarding → Plan Generation
+
+```mermaid
+sequenceDiagram
+    actor Student
+    participant UI as Next.js (browser)
+    participant SA as Server Action
+    participant Auth as Supabase Auth
+    participant DB as Supabase Postgres
+    participant LLM as Gemini (AI SDK)
+
+    Student->>UI: Sign up (name, email, pw, 13+)
+    UI->>SA: signUpAction
+    SA->>Auth: signUp()
+    Auth-->>SA: session + user
+    SA->>DB: update profile (name, tz)
+    SA-->>UI: redirect /onboarding
+    Student->>UI: Wizard (subjects, topics, dates, availability, length)
+    UI->>SA: commitOnboardingAction(input)
+    SA->>DB: persist subjects, topics, availability
+    SA->>SA: checkPlanFeasibility(input)
+    alt infeasible input
+        SA-->>UI: actionable error (e.g. exam date in past)
+    else feasible
+        SA->>LLM: generateObject(prompt, schema)
+        LLM-->>SA: candidate sessions
+        SA->>SA: validate (fit windows, no overlap, duration)
+        SA->>DB: insert active plan + sessions
+        SA-->>UI: redirect /today (plan visible)
+    end
+```
+
+### B2.4 Sequence — Adaptive Re-plan on Missed
+
+```mermaid
+sequenceDiagram
+    actor Student
+    participant UI as /today
+    participant SA as markMissedAction
+    participant DB as Postgres
+    participant LLM as Gemini
+
+    Student->>UI: Tap "Missed" on a session
+    UI->>SA: markMissedAction(sessionId)
+    SA->>DB: set status = missed
+    SA->>DB: load subjects, topics, availability, completed
+    SA->>LLM: regenerate remaining plan (exclude completed)
+    LLM-->>SA: new future sessions
+    SA->>SA: validate + diff vs old scheduled
+    SA->>DB: delete future scheduled, insert new
+    SA->>DB: update plan.lastReplannedAt + warnings
+    SA-->>UI: "Plan updated" overlay (what changed)
+```
+
+### B2.5 Use-Case Overview
+
+```mermaid
+flowchart LR
+    Student(("Student")):::a
+    Parent(("Parent / Payer")):::a
+
+    subgraph Pace
+      UC1["Create account / onboard"]
+      UC2["Generate adaptive plan"]
+      UC3["Follow today's sessions"]
+      UC4["Mark Complete / Missed"]
+      UC5["Auto re-plan on miss"]
+      UC6["Manage subjects & availability"]
+      UC7["Subscribe / manage family plan"]
+    end
+
+    Student --> UC1
+    Student --> UC2
+    Student --> UC3
+    Student --> UC4
+    UC4 --> UC5
+    Student --> UC6
+    Parent --> UC7
+    classDef a fill:#e1e6c2,stroke:#5c6145;
+```
+
+---
+
+## B3. Business Relationship Diagram and ERD
+
+### B3.1 Business Relationship Diagram (value exchange)
+
+Who exchanges what with whom. Solid = money; dashed = value/service/data.
+
+```mermaid
+flowchart TB
+    Student["HS Student (User)"]
+    Parent["Parent (Payer)"]
+    School["School / Teacher (Influencer)"]
+    Creators["StudyTok Creators (Channel)"]
+    Pace["Pace (Product Co.)"]
+    Supa["Supabase (DB/Auth)"]
+    Vercel["Vercel (Hosting)"]
+    Google["Google Gemini (LLM)"]
+    Stores["App/Web Distribution"]
+
+    Parent -- "£ subscription" --> Pace
+    Pace -. "adaptive study plan" .-> Student
+    Student -. "usage, outcomes" .-> Pace
+    Parent -. "sees progress / peace of mind" .-> Pace
+    School -. "credibility, referrals" .-> Student
+    Creators -- "£ / affiliate" --- Pace
+    Creators -. "reach, trust" .-> Student
+    Pace -- "£ infra (usage)" --> Supa
+    Pace -- "£ infra (usage)" --> Vercel
+    Pace -- "£ per token (at scale)" --> Google
+    Pace -. "distribution" .-> Stores
+    Stores -. "install base" .-> Student
+```
+
+### B3.2 Conceptual ERD (High-Level — Design Level 0)
+
+Entities and relationships only; no attributes. Answers "what things exist and how they relate."
+
+```mermaid
+erDiagram
+    USER ||--o{ SUBJECT : owns
+    USER ||--o{ AVAILABILITY : sets
+    SUBJECT ||--|{ TOPIC : contains
+    USER ||--o| PLAN : "has active"
+    PLAN ||--o{ SESSION : schedules
+    TOPIC ||--o{ SESSION : "studied in"
+```
+
+### B3.3 Logical ERD (Low-Level — Design Level 1)
+
+Normalised (3NF), keys shown, database-agnostic types. Answers "what attributes and keys, independent of vendor."
+
+```mermaid
+erDiagram
+    USER ||--o{ SUBJECT : owns
+    USER ||--o{ AVAILABILITY : sets
+    USER ||--o| PLAN : has
+    SUBJECT ||--|{ TOPIC : contains
+    PLAN ||--o{ SESSION : schedules
+    TOPIC ||--o{ SESSION : referenced_by
+
+    USER {
+        uuid id PK
+        string first_name
+        boolean age_confirmed
+        int session_length
+        string time_zone
+    }
+    SUBJECT {
+        uuid id PK
+        uuid user_id FK
+        string name
+        date exam_date "nullable"
+    }
+    TOPIC {
+        uuid id PK
+        uuid subject_id FK
+        uuid user_id FK
+        string name
+    }
+    AVAILABILITY {
+        uuid id PK
+        uuid user_id FK
+        int day_of_week
+        time starts_at
+        time ends_at
+    }
+    PLAN {
+        uuid id PK
+        uuid user_id FK
+        boolean is_active
+        datetime last_replanned_at "nullable"
+        json warnings
+    }
+    SESSION {
+        uuid id PK
+        uuid plan_id FK
+        uuid user_id FK
+        uuid topic_id FK
+        datetime starts_at
+        int duration_minutes
+        string instruction
+        string status
+        datetime completed_at "nullable"
+    }
+```
+
+### B3.4 Physical ERD (Low-Level — Design Level 2)
+
+Concrete Supabase/Postgres implementation: real column types, PK/FK, constraints, and Row-Level-Security note. Matches `DATABASE.md` + migration `0002_plan_warnings.sql`.
+
+```mermaid
+erDiagram
+    profiles ||--o{ subjects : "user_id"
+    profiles ||--o{ availability_windows : "user_id"
+    profiles ||--o{ plans : "user_id"
+    subjects ||--|{ topics : "subject_id"
+    plans ||--o{ sessions : "plan_id"
+    topics ||--o{ sessions : "topic_id"
+
+    profiles {
+        uuid id PK "= auth.users.id, on delete cascade"
+        timestamptz created_at
+        text first_name
+        boolean age_confirmed_13_plus
+        int session_length_minutes "CHECK in (25,45,60)"
+        text time_zone "IANA"
+    }
+    availability_windows {
+        uuid id PK
+        uuid user_id FK
+        int day_of_week "CHECK 0..6"
+        time starts_at
+        time ends_at "CHECK ends_at gt starts_at"
+    }
+    subjects {
+        uuid id PK
+        uuid user_id FK
+        text name
+        date exam_date "nullable"
+        timestamptz created_at
+    }
+    topics {
+        uuid id PK
+        uuid subject_id FK
+        uuid user_id FK
+        text name
+        timestamptz created_at
+    }
+    plans {
+        uuid id PK
+        uuid user_id FK
+        boolean is_active "partial unique per user where is_active"
+        timestamptz generated_at
+        timestamptz last_replanned_at "nullable"
+        jsonb warnings "default '[]'"
+    }
+    sessions {
+        uuid id PK
+        uuid plan_id FK
+        uuid user_id FK
+        uuid topic_id FK
+        timestamptz starts_at
+        int duration_minutes
+        text instruction
+        text status "CHECK scheduled|completed|missed"
+        timestamptz completed_at "nullable"
+    }
+```
+
+**Physical notes.** RLS is ON for every table with per-row `user_id = auth.uid()` policies (`TO authenticated`). Index on `sessions(user_id, starts_at)`; partial unique index `plans(user_id) WHERE is_active`. A trigger auto-creates a `profiles` row on new `auth.users`. No passwords, analytics, or third-party identifiers are stored (minors).
+
+---
+
+## B4. Business Research → Business Modelling
+
+### B4.1 Operational Model
+
+**How the business runs.** Pace is a lean, software-only, direct-to-consumer subscription business. There is no inventory, no logistics, and (in MVP) no human-in-the-loop per plan — the LLM does the work.
+
+```mermaid
+flowchart LR
+    subgraph Acquire
+      A1["StudyTok creators"]
+      A2["Organic PLG (shareable plans)"]
+      A3["Parent / school referrals"]
+    end
+    subgraph Activate
+      B1["Free onboarding + first plan"]
+    end
+    subgraph Retain
+      C1["Daily 'today' habit"]
+      C2["Adaptive re-plan reduces churn triggers"]
+    end
+    subgraph Monetise
+      D1["Family plan (parent pays)"]
+      D2["Individual plan"]
+    end
+    subgraph Operate
+      E1["Supabase + Vercel + Gemini"]
+      E2["Support + content ops"]
+      E3["Compliance (COPPA/GDPR-K)"]
+    end
+    Acquire --> Activate --> Retain --> Monetise
+    Monetise --> Operate
+    Operate -. "cost of serving" .-> Retain
+```
+
+**Operating responsibilities (RACI-lite, MVP → early growth).**
+
+| Function | MVP (founder-led) | Early growth |
+|---|---|---|
+| Product & Eng | Founder | Founder + 1–2 eng |
+| Content / StudyTok | Founder + creators | Creator manager + creators |
+| Support | Founder (async) | Part-time support |
+| Compliance / Legal | Advisor + templates | Fractional counsel |
+| Data / Analytics | Privacy-safe, minimal | Privacy-safe product analytics |
+
+**Key operating constraints (from Part I):** minors as users → no ads, no surveillance, privacy-first; demand is **seasonal** around exam windows; the buyer (parent) and user (student) differ, so activation and monetisation must be designed for both.
+
+### B4.2 P&L / Revenue Model
+
+> **All figures below are ILLUSTRATIVE model inputs (GBP), not measured data.** They are chosen to sit inside the willingness-to-pay bands evidenced in Part I (individual student planners £3–10/mo; family plans ~£80–150/yr) and to make the model computable. Replace with real numbers after a pricing test.
+
+**Revenue streams**
+
+```mermaid
+flowchart TD
+    Free["Free tier (1 subject, capped)"] -->|convert| Ind["Individual £4.99/mo or £39/yr"]
+    Free -->|convert| Fam["Family £99/yr (2–4 students)"]
+    Ind --> Rev["Subscription revenue"]
+    Fam --> Rev
+    School["(Future) School licence £5–15/student/yr"] --> Rev
+```
+
+**Cost structure (variable, per paying account / month — ASSUMPTION)**
+
+| Cost | Assumed £/paying acct/mo | Notes |
+|---|---|---|
+| LLM (plan gen + re-plans) | £0.05–0.20 | Gemini free tier in prototype; paid tier at scale. Few calls/user/mo. |
+| Hosting (Vercel + Supabase) | £0.10–0.30 | Fluid Compute + Postgres; scales with usage. |
+| Payment fees | ~3% of ARPU | Card + platform fees. |
+| **Total variable (COGS)** | **~£0.30–0.65** | Implies **~85–92% gross margin**. |
+
+**Unit economics (ILLUSTRATIVE)**
+
+| Metric | Assumption | Value |
+|---|---|---|
+| ARPPU (blended ind. + family) | mix-weighted | ~£4.50/mo |
+| Gross margin | after COGS | ~88% |
+| Avg paid lifetime | high-churn category | 7 months |
+| **LTV** (gross contribution) | ARPPU × margin × lifetime | **~£28** |
+| **CAC** (blended, creator-led) | low, teen-app benchmark (Part I: Photomath) | **£4–8** |
+| **LTV : CAC** | target > 3 | **~3.5–7×** (if churn assumption holds) |
+| Payback | CAC / (ARPPU × margin) | ~1–2 months |
+
+> **Biggest risk to these numbers (honest):** the *lifetime* assumption. Part I shows planner churn is high; if avg paid lifetime is 3 months not 7, LTV ≈ £12 and LTV:CAC compresses toward ~1.5–3×. Retention (adaptive re-plan, habit loop) is therefore the single most important lever — not price.
+
+**Illustrative 3-year P&L (scenario, GBP — ASSUMPTION-DRIVEN)**
+
+| Line | Y1 | Y2 | Y3 |
+|---|---|---|---|
+| Paying accounts (avg) | 1,500 | 12,000 | 45,000 |
+| Revenue (ARPPU £4.5 × 12) | £81k | £648k | £2.43m |
+| COGS (~12%) | (£10k) | (£78k) | (£292k) |
+| **Gross profit** | **£71k** | **£570k** | **£2.14m** |
+| S&M (creators, campaigns) | (£45k) | (£260k) | (£730k) |
+| R&D (product/eng) | (£90k) | (£240k) | (£520k) |
+| G&A (tools, legal, compliance) | (£25k) | (£70k) | (£180k) |
+| **EBITDA** | **(£89k)** | **£0k** | **£710k** |
+
+Shape, not certainty: heavy Y1 investment, ~break-even Y2, margin expansion Y3 as the software model's high gross margin drops through once CAC is amortised. Sensitivity is dominated by (1) free→paid conversion and (2) churn.
+
+### B4.3 Go-to-Market × Scalability
+
+```mermaid
+flowchart LR
+    subgraph Awareness
+      T["StudyTok creator content"]
+      P["Peer sharing (aesthetic plan output)"]
+    end
+    subgraph Consideration
+      L["Free plan in <5 min"]
+    end
+    subgraph Conversion
+      Pay["Parent upgrades (family plan)"]
+    end
+    subgraph Retention
+      H["Daily habit + adaptive re-plan"]
+    end
+    subgraph Referral
+      R["Share plan / invite friends"]
+    end
+    Awareness --> Consideration --> Conversion --> Retention --> Referral
+    Referral -. "loops back" .-> Awareness
+```
+
+#### Business (positioning & wedge)
+- **Wedge:** exam-anchored HS segment (UK A-Level/GCSE first for concreteness; US AP as expansion) — gives the adaptive re-plan a concrete reason to exist and maps onto an existing paid budget (test-prep). See Part I §13.
+- **Positioning to the payer:** outcome-framed ("stay on track for your exams / don't fall behind"), never "organise yourself." Parent pays for outcomes, student uses for calm.
+- **Moat over time:** retention data + re-plan quality + brand trust with a privacy-first stance for minors (a stance ad-funded competitors cannot easily copy).
+
+#### Resource (what it takes)
+- **MVP:** 1 founder-engineer; $0 stack (Vercel Hobby, Supabase Free, Gemini free tier) — see `COST.md`.
+- **Early growth:** +1–2 engineers, a part-time creator/community manager, fractional legal/compliance. No sales team (PLG + creator-led).
+- **Tooling stays lean and privacy-safe** (no behavioural analytics SDKs; minors).
+
+#### Campaigns (how we acquire)
+- **Primary:** TikTok Creator Marketplace, native creator content around exam season (Part I: Photomath's creator campaign drove installs at ~40% lower CPA).
+- **Organic PLG:** shareable, aesthetic plan output (the StudyTok currency) as a growth surface.
+- **Seasonal cadence:** concentrate spend into the 8–10 weeks before UK exam windows (and US AP), throttle off-season.
+- **Referral loop:** student invites friends; family plan invites siblings.
+- **Explicitly avoided:** paid ads targeting minors, surveillance/parental-control framing (Part I: 79% teen rejection of such apps).
+
+#### Costing and Operations (what it costs to run + serve)
+- **Serve cost per user is near-zero** (software; ~£0.30–0.65/paying acct/mo). The dominant cost is **acquisition (S&M)**, not COGS — so discipline is about CAC and payback, not infra.
+- **Infra scales elastically** (Fluid Compute + managed Postgres); no step-function cost cliffs at HS-scale volumes.
+- **Compliance is an operating cost, not optional:** architect for COPPA 2.0 (under-17) and GDPR-K now (age gate, minimal data, no ads). This is also a differentiator.
+
+```mermaid
+flowchart LR
+    subgraph "Cost mix at scale"
+      SM["S&M ~ 30% (dominant, CAC)"]
+      RD["R&D ~ 20%"]
+      GA["G&A ~ 8%"]
+      COGS["COGS ~ 12%"]
+      MGN["Margin ~ 30%"]
+    end
+```
+
+#### Growth (how it compounds)
+- **Retention-first:** the adaptive re-plan and the daily "today" habit are the growth engine — every point of retention improvement moves LTV more than any price change (see the P&L sensitivity note).
+- **Land-and-expand within the household:** individual → family plan (siblings) is the cheapest expansion.
+- **Segment expansion after PMF:** A-Level/GCSE → AP (US) → adjacent exam-anchored segments; later, multi-exam / college-readiness framing (Part I §12) as a larger MVP.
+- **Channel expansion:** creator-led → organic PLG → (much later, long-lead) school/teacher credibility and licences — a distribution play, not primary acquisition.
+
+```mermaid
+flowchart LR
+    S1["UK A-Level / GCSE"] --> S2["US AP"] --> S3["Adjacent exam-anchored segments"] --> S4["Multi-exam / college-readiness"]
+    S1 -. "same adaptive-replan engine" .-> S4
+```
+
+**Growth guardrails (from Part I risks):** commoditised category → win on retention + trust, not features; weak teen self-pay → monetise the parent via family plans; low organic buzz for planners → creator-led seeding is non-optional; seasonality → plan cash and campaigns around exam windows.
+
+---
+
+*End of Part II. Numbers are illustrative model inputs to be replaced with measured data after user interviews and a pricing test; systems diagrams reflect the implemented schema and flows in `DATABASE.md`, `ARCHITECTURE.md`, and `USER-FLOWS.md`.*
