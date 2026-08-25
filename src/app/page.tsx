@@ -64,13 +64,59 @@ export default function LandingPage() {
 
         {/* Product preview placeholder — bento tonal block. */}
         <section
-          aria-hidden="true"
-          className="relative w-full aspect-[16/9] md:aspect-[21/9] bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden mb-stack-lg md:mb-32"
-        >
-          <div className="absolute inset-0 flex items-center justify-center text-outline-variant font-label-sm text-label-sm uppercase tracking-wider">
-            Dashboard preview
-          </div>
-        </section>
+  aria-label="Pace dashboard preview"
+  className="relative w-full aspect-[16/9] md:aspect-[21/9] bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden mb-stack-lg md:mb-32 p-6 md:p-8"
+>
+  <div className="h-full rounded-lg border border-outline-variant bg-background p-4 md:p-6">
+    <div className="flex items-center justify-between mb-6">
+      <div>
+        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+          Today
+        </p>
+        <h3 className="font-headline-md text-headline-md text-on-surface mt-1">
+          Tuesday, 23 August
+        </h3>
+      </div>
+      <span className="rounded-full bg-secondary-container px-3 py-1 font-label-sm text-label-sm text-on-secondary-container">
+        On track
+      </span>
+    </div>
+
+    <div className="space-y-3">
+      <div className="rounded-lg border border-outline-variant p-4 flex items-center justify-between">
+        <div>
+          <p className="font-label-md text-label-md text-on-surface">Mathematics</p>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            Algebra · 45 min
+          </p>
+        </div>
+        <span className="text-label-sm text-on-surface-variant">16:00</span>
+      </div>
+
+      <div className="rounded-lg border border-outline-variant p-4 flex items-center justify-between">
+        <div>
+          <p className="font-label-md text-label-md text-on-surface">Physics</p>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            Mechanics · 45 min
+          </p>
+        </div>
+        <span className="text-label-sm text-on-surface-variant">17:00</span>
+      </div>
+
+      <div className="rounded-lg border border-primary-container/40 bg-primary-container/10 p-4 flex items-center justify-between">
+        <div>
+          <p className="font-label-md text-label-md text-on-surface">
+            Biology
+          </p>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            Cellular respiration · 25 min
+          </p>
+        </div>
+        <span className="text-label-sm text-primary">19:00</span>
+      </div>
+    </div>
+  </div>
+</section>
 
         {/* Method grid — structural clarity, typography-driven. */}
         <section id="method" className="mb-stack-lg md:mb-32 scroll-mt-24">

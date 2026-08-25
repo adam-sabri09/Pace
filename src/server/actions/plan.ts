@@ -6,35 +6,84 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { generatePlan } from "@/server/llm/generate";
 import type { PlanInput } from "@/server/llm/schema";
+import { utcToLocalParts } from "@/server/llm/time";
+import {
+  diffSessionsForOverlay,
+  type DiffEntry,
+  type PlanChange,
+  type PlanWarning,
+} from "@/server/llm/diff";
 
 /**
- * Loads the user's onboarding-persisted data, calls the LLM, and inserts
- * plans + sessions.
+ * Plan generation + adaptive re-planning.
  *
- * Not truly atomic — see the header of src/server/actions/onboarding.ts for
- * the recovery model. This function inserts plans first (with is_active =
- * true, guarded by the partial unique index), then sessions. On any failure
- * after plan insert, it best-effort deletes the plan (cascades to any
- * inserted sessions).
+ * Neither function is a single Postgres transaction — supabase-js goes
+ * through PostgREST, one HTTP call per statement (see the header of
+ * src/server/actions/onboarding.ts for the recovery model). Each writes in
+ * an order chosen so a mid-flow failure leaves a recoverable state.
  */
+
 export type PlanGenerationResult =
   | { ok: true; planId: string; sessionCount: number; warningCount: number }
   | { ok: false; error: string };
 
-export async function generatePlanForUser(
+export type RePlanResult =
+  | { ok: true; changes: PlanChange[]; warnings: PlanWarning[] }
+  | { ok: false; error: string };
+
+const SESSION_SELECT =
+  "id, starts_at, duration_minutes, instruction, status, topic:topics(name, subject:subjects(name))";
+
+type SessionRow = {
+  id: string;
+  starts_at: string;
+  duration_minutes: number;
+  instruction: string;
+  status: "scheduled" | "completed" | "missed";
+  topic: { name: string; subject: { name: string } | { name: string }[] | null } | { name: string; subject: { name: string } | { name: string }[] | null }[] | null;
+};
+
+function subjectTopicOf(row: SessionRow): { subjectName: string; topicName: string } {
+  const topic = Array.isArray(row.topic) ? row.topic[0] : row.topic;
+  const subject = topic
+    ? Array.isArray(topic.subject)
+      ? topic.subject[0]
+      : topic.subject
+    : null;
+  return {
+    subjectName: subject?.name ?? "Session",
+    topicName: topic?.name ?? "Study session",
+  };
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** Format a UTC session start as a "Mon 16:00" slot label in the user's tz. */
+function whenLabel(startsAtISO: string, timeZone: string): string {
+  const p = utcToLocalParts(new Date(startsAtISO), timeZone);
+  return `${WEEKDAYS[p.dayOfWeek]} ${p.timeString}`;
+}
+
+function toDiffEntry(
+  row: { starts_at: string; instruction: string; subjectName: string; topicName: string },
+  timeZone: string,
+): DiffEntry {
+  return {
+    key: `${row.subjectName}|${row.topicName}|${row.instruction}`,
+    label: `${row.subjectName} · ${row.topicName}`,
+    when: whenLabel(row.starts_at, timeZone),
+  };
+}
+
+/** Shared: build the LLM PlanInput from the user's persisted data. */
+async function buildPlanInput(
   supabase: SupabaseClient,
   userId: string,
   sessionLengthMinutes: 25 | 45 | 60,
-): Promise<PlanGenerationResult> {
-  // 1. Gather inputs. sessionLengthMinutes is passed in explicitly rather
-  //    than read from profiles because onboarding sets it LAST — after the
-  //    plan is safely saved — as its "onboarded" flag.
+  includeCompleted: boolean,
+): Promise<{ ok: true; input: PlanInput; timeZone: string } | { ok: false; error: string }> {
   const [profileRes, subjectsRes, availRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("time_zone")
-      .eq("id", userId)
-      .maybeSingle(),
+    supabase.from("profiles").select("time_zone").eq("id", userId).maybeSingle(),
     supabase
       .from("subjects")
       .select("id, name, exam_date, topics(id, name)")
@@ -56,6 +105,24 @@ export async function generatePlanForUser(
 
   const timeZone = profileRes.data.time_zone ?? "UTC";
 
+  let completedSessions: PlanInput["completedSessions"] = undefined;
+  if (includeCompleted) {
+    const { data: completed } = await supabase
+      .from("sessions")
+      .select(SESSION_SELECT)
+      .eq("user_id", userId)
+      .eq("status", "completed");
+    completedSessions = ((completed as SessionRow[] | null) ?? []).map((row) => {
+      const { subjectName, topicName } = subjectTopicOf(row);
+      return {
+        subjectName,
+        topicName,
+        startsAt: row.starts_at,
+        durationMinutes: row.duration_minutes,
+      };
+    });
+  }
+
   const input: PlanInput = {
     timeZone,
     now: new Date(),
@@ -70,24 +137,36 @@ export async function generatePlanForUser(
     })),
     availability: availRes.data.map((w) => ({
       dayOfWeek: w.day_of_week as number,
-      // Supabase returns TIME as "HH:MM:SS"; the schema expects HH:MM.
       startsAt: (w.starts_at as string).slice(0, 5),
       endsAt: (w.ends_at as string).slice(0, 5),
     })),
+    completedSessions,
   };
 
   if (input.subjects.length === 0) {
     return { ok: false, error: "You need at least one subject to generate a plan." };
   }
+  return { ok: true, input, timeZone };
+}
 
-  // 2. Call the LLM (with server-side validation + one retry inside generatePlan).
-  const generated = await generatePlan(input);
+// -----------------------------------------------------------------------------
+// Initial generation (called from onboarding). Creates the active plan.
+// -----------------------------------------------------------------------------
+
+export async function generatePlanForUser(
+  supabase: SupabaseClient,
+  userId: string,
+  sessionLengthMinutes: 25 | 45 | 60,
+): Promise<PlanGenerationResult> {
+  const built = await buildPlanInput(supabase, userId, sessionLengthMinutes, false);
+  if (!built.ok) return built;
+
+  const generated = await generatePlan(built.input);
   if (!generated.ok) return generated;
 
-  // 3. Insert an active plan (partial unique index enforces one active per user).
   const { data: planRow, error: planErr } = await supabase
     .from("plans")
-    .insert({ user_id: userId, is_active: true })
+    .insert({ user_id: userId, is_active: true, warnings: generated.warnings })
     .select("id")
     .single();
   if (planErr || !planRow) {
@@ -95,8 +174,6 @@ export async function generatePlanForUser(
   }
   const planId = planRow.id as string;
 
-  // 4. Insert sessions in a single bulk call. If it fails, remove the plan
-  //    row so we don't leak an empty active plan and block the next attempt.
   const sessionsPayload = generated.sessions.map((s) => ({
     plan_id: planId,
     user_id: userId,
@@ -123,4 +200,108 @@ export async function generatePlanForUser(
     sessionCount: generated.sessions.length,
     warningCount: generated.warnings.length,
   };
+}
+
+// -----------------------------------------------------------------------------
+// Adaptive re-plan (F7). Reuses the active plan; regenerates only future
+// scheduled sessions; preserves completed and missed sessions (D10).
+// -----------------------------------------------------------------------------
+
+export async function rePlanForUser(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<RePlanResult> {
+  // 1. Active plan + session length.
+  const [{ data: profile }, { data: activePlan }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("session_length_minutes")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabase
+      .from("plans")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle(),
+  ]);
+  const sessionLength = profile?.session_length_minutes as 25 | 45 | 60 | null;
+  if (sessionLength !== 25 && sessionLength !== 45 && sessionLength !== 60) {
+    return { ok: false, error: "Finish onboarding before re-planning." };
+  }
+  if (!activePlan) {
+    return { ok: false, error: "No active plan to update." };
+  }
+  const planId = activePlan.id as string;
+
+  // 2. Build input (with completed sessions so the LLM won't reschedule them).
+  const built = await buildPlanInput(supabase, userId, sessionLength, true);
+  if (!built.ok) return built;
+  const { input, timeZone } = built;
+
+  // 3. Snapshot the current scheduled sessions for the diff.
+  const { data: oldScheduled } = await supabase
+    .from("sessions")
+    .select(SESSION_SELECT)
+    .eq("user_id", userId)
+    .eq("status", "scheduled");
+  const oldEntries: DiffEntry[] = ((oldScheduled as SessionRow[] | null) ?? []).map(
+    (row) => toDiffEntry({ ...subjectTopicOf(row), starts_at: row.starts_at, instruction: row.instruction }, timeZone),
+  );
+
+  // 4. Generate the new plan (validated + one retry inside generatePlan).
+  const generated = await generatePlan(input);
+  if (!generated.ok) return generated;
+
+  // 5. Swap sessions: delete ALL scheduled (past + future), insert the new
+  //    future ones under the same plan. Completed and missed stay untouched.
+  const { error: delErr } = await supabase
+    .from("sessions")
+    .delete()
+    .eq("user_id", userId)
+    .eq("status", "scheduled");
+  if (delErr) {
+    return { ok: false, error: "Could not update your schedule. Try again." };
+  }
+
+  const sessionsPayload = generated.sessions.map((s) => ({
+    plan_id: planId,
+    user_id: userId,
+    topic_id: s.topicId,
+    starts_at: s.startsAtUTC.toISOString(),
+    duration_minutes: s.durationMinutes,
+    instruction: s.instruction,
+    status: "scheduled" as const,
+  }));
+  if (sessionsPayload.length > 0) {
+    const { error: insErr } = await supabase.from("sessions").insert(sessionsPayload);
+    if (insErr) {
+      return { ok: false, error: "Could not save your updated schedule. Try again." };
+    }
+  }
+
+  // 6. Update plan metadata (last_replanned_at + persisted warnings, C-i).
+  await supabase
+    .from("plans")
+    .update({
+      last_replanned_at: new Date().toISOString(),
+      warnings: generated.warnings,
+    })
+    .eq("id", planId);
+
+  // 7. Build the diff for the overlay.
+  const newEntries: DiffEntry[] = generated.sessions.map((s) =>
+    toDiffEntry(
+      {
+        subjectName: s.subjectName,
+        topicName: s.topicName,
+        instruction: s.instruction,
+        starts_at: s.startsAtUTC.toISOString(),
+      },
+      timeZone,
+    ),
+  );
+  const diff = diffSessionsForOverlay(oldEntries, newEntries);
+
+  return { ok: true, changes: diff.changes, warnings: generated.warnings };
 }

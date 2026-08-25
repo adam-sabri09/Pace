@@ -6,29 +6,33 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { SessionIdSchema } from "@/lib/validation/sessions";
+import { rePlanForUser } from "@/server/actions/plan";
+import type { PlanChange, PlanWarning } from "@/server/llm/diff";
 
 /**
  * Session mutations for the /today dashboard.
  *
- * Both actions are:
- *   * Zod-validated at the boundary.
- *   * Auth-checked (RLS still applies, but we short-circuit for a
- *     clearer error).
- *   * Idempotent in the F6.3 sense — only sessions currently in
- *     `scheduled` transition; anything else is a no-op success.
+ * markDoneAction (F6.1): mark completed, no replan.
+ * markMissedAction (F6.2 + F7): mark missed, then adaptively re-plan the
+ *   remaining schedule and return the diff + warnings for the overlay.
  *
- * F6.2's replan side-effect is deferred to Step 7. In Step 6 Missed
- * simply marks the row so the card renders in its muted state.
+ * Both are Zod-validated, auth-checked, and idempotent in the F6.3 sense:
+ * the status transition only fires for a `scheduled` row, but markMissed
+ * always runs the replan afterwards so a retry (row already `missed`) still
+ * regenerates the plan.
  */
 
 export type SessionActionState =
   | { ok: true }
   | { ok: false; error: string };
 
-async function transitionSession(
-  sessionId: string,
-  next: "completed" | "missed",
-): Promise<SessionActionState> {
+export type DoneResult = { ok: true } | { ok: false; error: string };
+
+export type MissedResult =
+  | { ok: true; changes: PlanChange[]; warnings: PlanWarning[] }
+  | { ok: false; error: string };
+
+export async function markDoneAction(sessionId: string): Promise<DoneResult> {
   const parsed = SessionIdSchema.safeParse({ sessionId });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0].message };
@@ -40,17 +44,9 @@ async function transitionSession(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "You need to be signed in." };
 
-  // Only transition from scheduled → next. UPDATE with an eq filter on status
-  // makes this atomic per-row; a race with another tab leaves the second call
-  // as a no-op (0 rows affected), which we treat as success per F6.3.
-  const patch =
-    next === "completed"
-      ? { status: "completed" as const, completed_at: new Date().toISOString() }
-      : { status: "missed" as const };
-
   const { error } = await supabase
     .from("sessions")
-    .update(patch)
+    .update({ status: "completed", completed_at: new Date().toISOString() })
     .eq("id", parsed.data.sessionId)
     .eq("user_id", user.id)
     .eq("status", "scheduled");
@@ -59,20 +55,42 @@ async function transitionSession(
     return { ok: false, error: "We couldn't update that session. Try again." };
   }
 
-  // Refresh any page that renders sessions.
   revalidatePath("/today");
   revalidatePath("/plan");
   return { ok: true };
 }
 
-export async function markDoneAction(
-  sessionId: string,
-): Promise<SessionActionState> {
-  return transitionSession(sessionId, "completed");
-}
-
 export async function markMissedAction(
   sessionId: string,
-): Promise<SessionActionState> {
-  return transitionSession(sessionId, "missed");
+): Promise<MissedResult> {
+  const parsed = SessionIdSchema.safeParse({ sessionId });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You need to be signed in." };
+
+  // Mark missed (no-op if already missed — makes retry safe). We ignore the
+  // 0-rows case on purpose so a retried replan still runs.
+  const { error: updErr } = await supabase
+    .from("sessions")
+    .update({ status: "missed" })
+    .eq("id", parsed.data.sessionId)
+    .eq("user_id", user.id)
+    .eq("status", "scheduled");
+  if (updErr) {
+    return { ok: false, error: "We couldn't mark that session missed. Try again." };
+  }
+
+  // Adaptive re-plan of the remaining schedule.
+  const replan = await rePlanForUser(supabase, user.id);
+  if (!replan.ok) return replan;
+
+  revalidatePath("/today");
+  revalidatePath("/plan");
+  return { ok: true, changes: replan.changes, warnings: replan.warnings };
 }
