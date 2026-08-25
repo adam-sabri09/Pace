@@ -433,11 +433,11 @@ stateDiagram-v2
 ```mermaid
 sequenceDiagram
     actor Student
-    participant UI as Next.js (browser)
+    participant UI as Next.js Browser
     participant SA as Server Action
     participant Auth as Supabase Auth
     participant DB as Supabase Postgres
-    participant LLM as Gemini (AI SDK)
+    participant LLM as Gemini AI SDK
 
     Student->>UI: Sign up (name, email, pw, 13+)
     UI->>SA: signUpAction
@@ -465,7 +465,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Student
-    participant UI as /today
+    participant UI as Today Page
     participant SA as markMissedAction
     participant DB as Postgres
     participant LLM as Gemini
@@ -529,18 +529,18 @@ flowchart TB
     Google["Google Gemini (LLM)"]
     Stores["App/Web Distribution"]
 
-    Parent -- "£ subscription" --> Pace
-    Pace -. "adaptive study plan" .-> Student
-    Student -. "usage, outcomes" .-> Pace
-    Parent -. "sees progress / peace of mind" .-> Pace
-    School -. "credibility, referrals" .-> Student
-    Creators -- "£ / affiliate" --- Pace
-    Creators -. "reach, trust" .-> Student
-    Pace -- "£ infra (usage)" --> Supa
-    Pace -- "£ infra (usage)" --> Vercel
-    Pace -- "£ per token (at scale)" --> Google
-    Pace -. "distribution" .-> Stores
-    Stores -. "install base" .-> Student
+    Parent -->|subscription GBP| Pace
+    Pace -.->|adaptive study plan| Student
+    Student -.->|usage and outcomes| Pace
+    Parent -.->|progress and peace of mind| Pace
+    School -.->|credibility and referrals| Student
+    Creators -->|revenue share| Pace
+    Creators -.->|reach and trust| Student
+    Pace -->|infra spend| Supa
+    Pace -->|infra spend| Vercel
+    Pace -->|per token at scale| Google
+    Pace -.->|distribution| Stores
+    Stores -.->|install base| Student
 ```
 
 ### B3.2 Conceptual ERD (High-Level — Design Level 0)
@@ -581,7 +581,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         string name
-        date exam_date "nullable"
+        date exam_date
     }
     TOPIC {
         uuid id PK
@@ -600,7 +600,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         boolean is_active
-        datetime last_replanned_at "nullable"
+        datetime last_replanned_at
         json warnings
     }
     SESSION {
@@ -612,7 +612,7 @@ erDiagram
         int duration_minutes
         string instruction
         string status
-        datetime completed_at "nullable"
+        datetime completed_at
     }
 ```
 
@@ -630,25 +630,25 @@ erDiagram
     topics ||--o{ sessions : "topic_id"
 
     profiles {
-        uuid id PK "= auth.users.id, on delete cascade"
+        uuid id PK
         timestamptz created_at
         text first_name
         boolean age_confirmed_13_plus
-        int session_length_minutes "CHECK in (25,45,60)"
-        text time_zone "IANA"
+        int session_length_minutes
+        text time_zone
     }
     availability_windows {
         uuid id PK
         uuid user_id FK
-        int day_of_week "CHECK 0..6"
+        int day_of_week
         time starts_at
-        time ends_at "CHECK ends_at gt starts_at"
+        time ends_at
     }
     subjects {
         uuid id PK
         uuid user_id FK
         text name
-        date exam_date "nullable"
+        date exam_date
         timestamptz created_at
     }
     topics {
@@ -661,10 +661,10 @@ erDiagram
     plans {
         uuid id PK
         uuid user_id FK
-        boolean is_active "partial unique per user where is_active"
+        boolean is_active
         timestamptz generated_at
-        timestamptz last_replanned_at "nullable"
-        jsonb warnings "default '[]'"
+        timestamptz last_replanned_at
+        jsonb warnings
     }
     sessions {
         uuid id PK
@@ -674,12 +674,18 @@ erDiagram
         timestamptz starts_at
         int duration_minutes
         text instruction
-        text status "CHECK scheduled|completed|missed"
-        timestamptz completed_at "nullable"
+        text status
+        timestamptz completed_at
     }
 ```
 
-**Physical notes.** RLS is ON for every table with per-row `user_id = auth.uid()` policies (`TO authenticated`). Index on `sessions(user_id, starts_at)`; partial unique index `plans(user_id) WHERE is_active`. A trigger auto-creates a `profiles` row on new `auth.users`. No passwords, analytics, or third-party identifiers are stored (minors).
+**Physical notes / constraints** (kept in prose so the ERD stays renderer-portable):
+
+- `profiles.id` = `auth.users.id`, `ON DELETE CASCADE`; every other table's `user_id` cascades from `profiles`.
+- CHECKs: `profiles.session_length_minutes IN (25,45,60)`; `availability_windows.day_of_week BETWEEN 0 AND 6` and `ends_at > starts_at`; `sessions.status IN ('scheduled','completed','missed')`.
+- `plans.warnings` is `jsonb NOT NULL DEFAULT '[]'`; `exam_date`, `last_replanned_at`, `completed_at` are nullable.
+- Indexes: `sessions(user_id, starts_at)`; **partial unique** `plans(user_id) WHERE is_active` (one active plan per user).
+- RLS ON for every table with per-row `user_id = auth.uid()` policies (`TO authenticated`). A trigger auto-creates a `profiles` row on new `auth.users`. No passwords, analytics, or third-party identifiers stored (minors).
 
 ---
 
@@ -737,11 +743,11 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Free["Free tier (1 subject, capped)"] -->|convert| Ind["Individual £4.99/mo or £39/yr"]
-    Free -->|convert| Fam["Family £99/yr (2–4 students)"]
+    Free["Free tier: 1 subject, capped"] -->|convert| Ind["Individual: GBP 4.99/mo or 39/yr"]
+    Free -->|convert| Fam["Family: GBP 99/yr for 2-4 students"]
     Ind --> Rev["Subscription revenue"]
     Fam --> Rev
-    School["(Future) School licence £5–15/student/yr"] --> Rev
+    School["Future: School licence GBP 5-15/student/yr"] --> Rev
 ```
 
 **Cost structure (variable, per paying account / month — ASSUMPTION)**
@@ -830,12 +836,12 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    subgraph "Cost mix at scale"
-      SM["S&M ~ 30% (dominant, CAC)"]
-      RD["R&D ~ 20%"]
-      GA["G&A ~ 8%"]
-      COGS["COGS ~ 12%"]
-      MGN["Margin ~ 30%"]
+    subgraph CostMix["Cost mix at scale"]
+      SM["Sales and Marketing approx 30 percent - dominant, CAC"]
+      RD["R and D approx 20 percent"]
+      GA["G and A approx 8 percent"]
+      COGS["COGS approx 12 percent"]
+      MGN["Margin approx 30 percent"]
     end
 ```
 
@@ -847,8 +853,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    S1["UK A-Level / GCSE"] --> S2["US AP"] --> S3["Adjacent exam-anchored segments"] --> S4["Multi-exam / college-readiness"]
-    S1 -. "same adaptive-replan engine" .-> S4
+    S1["UK A-Level and GCSE"] --> S2["US AP"] --> S3["Adjacent exam-anchored segments"] --> S4["Multi-exam and college-readiness"]
+    S1 -.->|same adaptive-replan engine| S4
 ```
 
 **Growth guardrails (from Part I risks):** commoditised category → win on retention + trust, not features; weak teen self-pay → monetise the parent via family plans; low organic buzz for planners → creator-led seeding is non-optional; seasonality → plan cash and campaigns around exam windows.
