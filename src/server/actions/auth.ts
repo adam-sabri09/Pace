@@ -5,6 +5,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { friendlyAuthError } from "@/lib/auth/errors";
 import { LogInSchema, SignUpSchema } from "@/lib/validation/auth";
 
 /**
@@ -18,34 +19,6 @@ import { LogInSchema, SignUpSchema } from "@/lib/validation/auth";
  */
 
 export type AuthActionState = { ok: false; error: string } | null;
-
-/**
- * Map raw Supabase / Postgres errors to user-safe messages. We deliberately
- * do NOT expose the raw error to the client — it can leak enumeration signals
- * (e.g. "user already registered") or DB internals. The messages returned
- * from this function are the ONLY thing surfaced in the UI.
- */
-function friendlyAuthError(code: string | undefined, fallback: string): string {
-  switch (code) {
-    case "invalid_credentials":
-    case "invalid_grant":
-      return "Those credentials didn't work. Try again.";
-    case "email_exists":
-    case "user_already_exists":
-    case "user_already_registered":
-      return "An account with that email already exists. Try logging in.";
-    case "email_address_invalid":
-    case "invalid_email":
-      return "That email address isn't accepted. Use a real address.";
-    case "weak_password":
-      return "That password is too weak. Use at least 8 characters.";
-    case "over_email_send_rate_limit":
-    case "over_request_rate_limit":
-      return "Too many attempts. Wait a moment and try again.";
-    default:
-      return fallback;
-  }
-}
 
 // -----------------------------------------------------------------------------
 // signUp
@@ -87,6 +60,19 @@ export async function signUpAction(
   }
   if (!signUpResult.user) {
     return { ok: false, error: "Signup failed. Try again." };
+  }
+
+  // Defensive: for the prototype, email confirmation is disabled (DECISIONS
+  // B-i), so signUp establishes a session immediately. If confirmation is ever
+  // re-enabled at the project level, signUp returns a user but NO session —
+  // in that case the profile update below would silently hit 0 rows under RLS
+  // and redirect("/today") would bounce the user back to /login with no
+  // explanation. Surface a clear message and stop instead.
+  if (!signUpResult.session) {
+    return {
+      ok: false,
+      error: "Almost there — check your email to confirm your account, then log in.",
+    };
   }
 
   // 2. Complete the profile row (auto-created by the trigger with only `id`).
