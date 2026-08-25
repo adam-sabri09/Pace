@@ -183,3 +183,43 @@ export function latestExamDateOf(input: PlanInput): string | null {
   }
   return latest;
 }
+
+/**
+ * Pre-flight feasibility check, run BEFORE calling the LLM.
+ *
+ * Catches the impossible-input cases that otherwise make the model return an
+ * empty plan (which used to crash with an opaque error). Returns a specific,
+ * actionable message the user can act on instead of a generic failure.
+ */
+export function checkPlanFeasibility(
+  input: PlanInput,
+): { ok: true } | { ok: false; error: string } {
+  // 1. At least one exam/target date must be strictly in the future (the
+  //    user's local "today"). An exam today or in the past leaves no room to
+  //    schedule study before it.
+  const todayLocal = utcToLocalParts(input.now, input.timeZone).dateString;
+  const latestExam = latestExamDateOf(input);
+  if (!latestExam || latestExam <= todayLocal) {
+    return {
+      ok: false,
+      error:
+        "Set an exam or target date in the future so Pace can schedule study time before it.",
+    };
+  }
+
+  // 2. At least one availability window must be long enough for a single
+  //    session. If every window is shorter than the session length, no
+  //    session can ever fit.
+  const longestWindow = input.availability.reduce((max, w) => {
+    const len = hhmmToMinutes(w.endsAt) - hhmmToMinutes(w.startsAt);
+    return len > max ? len : max;
+  }, 0);
+  if (longestWindow < input.sessionLengthMinutes) {
+    return {
+      ok: false,
+      error: `Your available time blocks are shorter than your ${input.sessionLengthMinutes}-minute sessions. Add a longer window or choose a shorter session length.`,
+    };
+  }
+
+  return { ok: true };
+}

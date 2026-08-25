@@ -28,6 +28,14 @@ import {
 // quality; single-line swap if a future deprecation moves us again.
 const MODEL_ID = "gemini-3.6-flash";
 
+// Surfaced when the model returns a valid but EMPTY plan — i.e. the
+// constraints leave no room for any session before the exam (e.g. all
+// availability falls after the exam date). The feasibility pre-check in
+// validate.ts catches the common cases earlier with more specific text; this
+// is the backstop for residual infeasible inputs.
+const NO_FEASIBLE_SESSIONS =
+  "We couldn't fit any study sessions before your exam date. Add more available time, or move your exam date further out.";
+
 export type GenerateResult =
   | {
       ok: true;
@@ -60,6 +68,11 @@ export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
 
     const validated = validatePlanOutput(input, raw, latestExam);
     if (!validated.ok) return validated;
+    // A valid but empty plan means the constraints left no room. Treat it as a
+    // failed attempt (so it retries once) carrying an actionable message.
+    if (validated.sessions.length === 0) {
+      return { ok: false, error: NO_FEASIBLE_SESSIONS };
+    }
     return {
       ok: true,
       sessions: validated.sessions,
@@ -74,8 +87,15 @@ export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
   const second = await attempt(basePrompt + addendum);
   if (second.ok) return second;
 
+  // Surface the real reason rather than an opaque generic. If the model kept
+  // returning an empty plan, that specific message is the most useful; any
+  // other residual validation failure gets an actionable fallback.
+  if (second.error === NO_FEASIBLE_SESSIONS || first.error === NO_FEASIBLE_SESSIONS) {
+    return { ok: false, error: NO_FEASIBLE_SESSIONS };
+  }
   return {
     ok: false,
-    error: "We couldn't build a valid plan. Please try again.",
+    error:
+      "We couldn't build a plan that fits your available time. Try adding more availability, reducing topics, or moving your exam date.",
   };
 }
