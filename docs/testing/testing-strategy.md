@@ -20,7 +20,7 @@ No tests for framework code, third-party libraries, or trivial getters/setters.
 
 ## What must be tested for each requirement
 
-Referencing the requirement IDs in [REQUIREMENTS.md](REQUIREMENTS.md):
+Referencing the requirement IDs in [REQUIREMENTS.md](../requirements/requirements.md):
 
 | Requirement | Test type | What to verify |
 |---|---|---|

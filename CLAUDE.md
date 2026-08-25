@@ -10,28 +10,29 @@ Target user: high school students (~14–18). No other segment. No parent-facing
 
 ## Working style
 
-- Small, incremental changes. One feature per branch. See [RULES.md](RULES.md).
+- Small, incremental changes. One feature per branch. See [RULES.md](./docs/development/development-rules.md).
 - Explain non-trivial choices in short sentences. This is a learning project as much as a product.
-- Do not add features beyond the MVP defined in [PRODUCT.md](PRODUCT.md). Flag scope creep instead of implementing it.
+- Do not add features beyond the MVP defined in [PRODUCT.md](./docs/requirements/product-scope.md). Flag scope creep instead of implementing it.
 - Prefer editing existing files over creating new ones. Do not write files unless they are part of the MVP or explicitly requested.
 - No unnecessary documentation, comments, or abstractions.
 
 ## Where things live
 
-- Product scope: [PRODUCT.md](PRODUCT.md)
-- Functional + non-functional requirements: [REQUIREMENTS.md](REQUIREMENTS.md)
-- System design: [ARCHITECTURE.md](ARCHITECTURE.md)
-- Data model: [DATABASE.md](DATABASE.md)
-- Key user flows: [USER-FLOWS.md](USER-FLOWS.md)
-- UI scope: [UI.md](UI.md)
-- Testing approach: [TESTING.md](TESTING.md)
-- Decisions log: [DECISIONS.md](DECISIONS.md)
-- Development rules: [RULES.md](RULES.md)
-- Folder layout: [PROJECT-STRUCTURE.md](PROJECT-STRUCTURE.md)
-- Server-action contracts: [API.md](API.md)
-- Git branching: [BRANCHING.md](BRANCHING.md)
-- $0 stack audit: [COST.md](COST.md)
-- Phase-1 research (for reference only): [market-research.md](market-research.md), [market-research-hs.md](market-research-hs.md)
+- Product scope: [PRODUCT.md](./docs/requirements/product-scope.md)
+- Functional + non-functional requirements: [REQUIREMENTS.md](./docs/requirements/requirements.md)
+- System design: [ARCHITECTURE.md](./docs/technical/architecture.md)
+- Data model: [DATABASE.md](./docs/technical/database.md)
+- Key user flows: [USER-FLOWS.md](./docs/design/user-flows.md)
+- UI scope: [UI.md](./docs/design/ui-spec.md)
+- Testing approach: [TESTING.md](./docs/testing/testing-strategy.md)
+- Decisions log: [DECISIONS.md](./docs/development/decisions-log.md)
+- Development rules: [RULES.md](./docs/development/development-rules.md)
+- Folder layout: [PROJECT-STRUCTURE.md](./docs/technical/project-structure.md)
+- Server-action contracts: [API.md](./docs/technical/api-contracts.md)
+- Git branching: [BRANCHING.md](./docs/development/branching-strategy.md)
+- $0 stack audit: [COST.md](./docs/technical/cost-and-stack-audit.md)
+- Market & business research: [market-research.md](./docs/research/market-research.md)
+- Documentation index: [docs/README.md](./docs/README.md)
 
 ## Absolute don'ts in this repo
 

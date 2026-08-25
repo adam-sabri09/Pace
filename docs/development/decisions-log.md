@@ -9,7 +9,7 @@ Format: `[N] Title — Status — Decision — Reasoning — Trade-offs`.
 ## D1. Target market is high school students, no pivot.
 - **Status**: Accepted
 - **Decision**: The user is a high school student (14–18). No parent view, no teacher view, no adult / medical / bar / college segment.
-- **Reasoning**: Explicit user constraint. Developmental-neuroscience evidence supports HS specifically (see [market-research-hs.md](market-research-hs.md)).
+- **Reasoning**: Explicit user constraint. Developmental-neuroscience evidence supports HS specifically (see [market-research-hs.md](../research/market-research.md)).
 - **Trade-off**: Willingness to pay is weaker than adult segments; monetization is deferred.
 
 ## D2. MVP scope is a generic adaptive planner, not exam-anchored or college-readiness.
@@ -81,7 +81,7 @@ Format: `[N] Title — Status — Decision — Reasoning — Trade-offs`.
 ## D14. LLM provider is Google Gemini (free tier), not Claude, for the prototype.
 - **Status**: Accepted (revises D4 for the LLM sub-choice)
 - **Decision**: Use Google Gemini via AI SDK for prototype development. Anthropic Claude and OpenAI both require a credit card to obtain an API key; Gemini's AI Studio free tier does not.
-- **Reasoning**: [COST.md](COST.md) documents that Gemini is the only major frontier-lab option with a genuine no-card free tier suitable for a $0 prototype. Because we call the LLM through AI SDK `generateObject` with a Zod schema, swapping providers later is a one-line change.
+- **Reasoning**: [COST.md](../technical/cost-and-stack-audit.md) documents that Gemini is the only major frontier-lab option with a genuine no-card free tier suitable for a $0 prototype. Because we call the LLM through AI SDK `generateObject` with a Zod schema, swapping providers later is a one-line change.
 - **Trade-off**: Slightly different model behavior than Claude; free-tier rate limits (~15 rpm) constrain us if we ever demo to many users at once.
 
 ## D15. Time zones are stored per user (IANA); sessions use `timestamptz`.
@@ -105,7 +105,7 @@ Format: `[N] Title — Status — Decision — Reasoning — Trade-offs`.
 ## D18. Prototype domain is a `.vercel.app` subdomain.
 - **Status**: Accepted
 - **Decision**: No custom domain in the prototype.
-- **Reasoning**: [COST.md](COST.md) — keeps us at $0.
+- **Reasoning**: [COST.md](../technical/cost-and-stack-audit.md) — keeps us at $0.
 - **Trade-off**: Slightly less polished URL. Fine for prototype.
 
 ## D19. Rate limiting deferred.
@@ -117,7 +117,7 @@ Format: `[N] Title — Status — Decision — Reasoning — Trade-offs`.
 ## D20. Trunk-based branching, squash merges.
 - **Status**: Accepted
 - **Decision**: One `main` branch; short-lived feature/fix/chore/docs branches; PRs are squash-merged.
-- **Reasoning**: See [BRANCHING.md](BRANCHING.md). Simplest workflow that still teaches good hygiene.
+- **Reasoning**: See [BRANCHING.md](./branching-strategy.md). Simplest workflow that still teaches good hygiene.
 - **Trade-off**: No release branches. Sufficient for MVP; can be revisited.
 
 ## D12. No LMS import in MVP.
@@ -130,7 +130,7 @@ Format: `[N] Title — Status — Decision — Reasoning — Trade-offs`.
 
 ## Phase 3 design review — resolutions of Stitch conflicts (C1–C15)
 
-All 15 conflicts flagged in [DESIGN-SPEC.md](DESIGN-SPEC.md) §7 were resolved by the user on 2026-08-23. Recorded here so the resolution is durable.
+All 15 conflicts flagged in [DESIGN-SPEC.md](../design/design-spec.md) §7 were resolved by the user on 2026-08-23. Recorded here so the resolution is durable.
 
 ## D21. Session lengths are 25 / 45 / 60 minutes (resolves C1).
 - **Status**: Accepted

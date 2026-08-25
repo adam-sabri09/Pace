@@ -11,7 +11,7 @@
 - **Hosting**: Vercel.
 - **Package manager**: npm.
 
-Rationale for each pick lives in [DECISIONS.md](DECISIONS.md). Reasoning was: simplicity, low cost, fast dev, one deployable unit, and matches the tools available in this environment.
+Rationale for each pick lives in [DECISIONS.md](../development/decisions-log.md). Reasoning was: simplicity, low cost, fast dev, one deployable unit, and matches the tools available in this environment.
 
 ## Shape of the system
 

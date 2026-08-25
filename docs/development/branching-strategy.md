@@ -25,7 +25,7 @@ Slugs are lowercase, hyphen-separated, and describe intent: `feature/plan-genera
 
 - One imperative sentence in the subject line, ≤ 72 chars.
 - Optional body explaining *why* (not *what* — the diff shows the what).
-- Reference requirement IDs from [REQUIREMENTS.md](REQUIREMENTS.md) when applicable, e.g. `Implement F4.1 plan generation`.
+- Reference requirement IDs from [REQUIREMENTS.md](../requirements/requirements.md) when applicable, e.g. `Implement F4.1 plan generation`.
 
 ## Rules
 

@@ -84,4 +84,4 @@ This is a directional gate, not a business metric.
 
 ## Cost constraint
 
-$0 stack for the entire prototype. See [COST.md](COST.md). No payments, ads, analytics, LMS, social, or content-generation features.
+$0 stack for the entire prototype. See [COST.md](../technical/cost-and-stack-audit.md). No payments, ads, analytics, LMS, social, or content-generation features.

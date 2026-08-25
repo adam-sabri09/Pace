@@ -4,7 +4,7 @@ Development rules for this project. Short list. All items apply.
 
 ## Scope
 
-1. If a change is not in [PRODUCT.md](PRODUCT.md) MVP scope, do not implement it. Flag it in [DECISIONS.md](DECISIONS.md) as deferred.
+1. If a change is not in [PRODUCT.md](../requirements/product-scope.md) MVP scope, do not implement it. Flag it in [DECISIONS.md](./decisions-log.md) as deferred.
 2. Bug fixes stay tightly scoped. No opportunistic refactors in a fix PR.
 3. No premature abstraction. Three similar lines beat a bad helper.
 
@@ -26,7 +26,7 @@ Development rules for this project. Short list. All items apply.
 
 ## Testing
 
-See [TESTING.md](TESTING.md). Every feature ships with tests for the happy path and one edge case at minimum.
+See [TESTING.md](../testing/testing-strategy.md). Every feature ships with tests for the happy path and one edge case at minimum.
 
 ## AI / LLM
 

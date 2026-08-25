@@ -107,8 +107,8 @@ The wizard replaces the one-form onboarding. Progress indicator and "Save & Exit
 
 ### N6. Cost & simplicity
 - N6.1 The stack must be operable by a single beginner/intermediate developer.
-- N6.2 Total infrastructure cost stays at $0 during prototype (see [COST.md](COST.md)).
+- N6.2 Total infrastructure cost stays at $0 during prototype (see [COST.md](../technical/cost-and-stack-audit.md)).
 
 ## Out of scope for MVP
 
-Anything not in F1–F12 or N1–N6. Deferred items live in [PRODUCT.md](PRODUCT.md) under "not solving."
+Anything not in F1–F12 or N1–N6. Deferred items live in [PRODUCT.md](./product-scope.md) under "not solving."

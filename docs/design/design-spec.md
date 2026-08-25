@@ -536,7 +536,7 @@ Documented gaps to fill later (either with a follow-up Stitch pass or with plain
 
 ## 10. Resolutions of §7 conflicts (locked)
 
-All 15 conflicts were resolved on 2026-08-23 and recorded in [DECISIONS.md](DECISIONS.md) D21–D35. Summary for quick reference during implementation:
+All 15 conflicts were resolved on 2026-08-23 and recorded in [DECISIONS.md](../development/decisions-log.md) D21–D35. Summary for quick reference during implementation:
 
 | ID | Topic | Resolution |
 |---|---|---|

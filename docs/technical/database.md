@@ -17,7 +17,7 @@ One row per authenticated user. Linked to `auth.users` by id.
 | `time_zone` | text | IANA; captured automatically from the browser at signup |
 
 ### `availability_windows`
-Weekly recurring available time windows per day of week. **Replaces the previous single-minutes-per-day model** (see [DECISIONS.md](DECISIONS.md) D24).
+Weekly recurring available time windows per day of week. **Replaces the previous single-minutes-per-day model** (see [DECISIONS.md](../development/decisions-log.md) D24).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -47,7 +47,7 @@ CHECK: `ends_at > starts_at`. Application-level check ensures no overlapping win
 | `name` | text | |
 | `created_at` | timestamptz | |
 
-**Note**: `difficulty` was removed per [DECISIONS.md](DECISIONS.md) D22. The LLM infers ordering from exam-proximity and topic count alone.
+**Note**: `difficulty` was removed per [DECISIONS.md](../development/decisions-log.md) D22. The LLM infers ordering from exam-proximity and topic count alone.
 
 ### `plans`
 Represents one generated plan. A user has at most one active plan at a time in the MVP.
@@ -74,7 +74,7 @@ Individual scheduled study sessions.
 | `starts_at` | timestamptz | |
 | `duration_minutes` | int | matches `profiles.session_length_minutes` |
 | `instruction` | text | e.g. "Review", "Practice problems" |
-| `status` | text | `scheduled` \| `completed` \| `missed` (renamed from `skipped` — [DECISIONS.md](DECISIONS.md) D25) |
+| `status` | text | `scheduled` \| `completed` \| `missed` (renamed from `skipped` — [DECISIONS.md](../development/decisions-log.md) D25) |
 | `completed_at` | timestamptz | nullable |
 
 Index on (`user_id`, `starts_at`).

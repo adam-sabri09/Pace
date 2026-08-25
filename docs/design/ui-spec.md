@@ -1,6 +1,6 @@
 # UI.md
 
-Visual source of truth: [DESIGN-SPEC.md](DESIGN-SPEC.md) (derived from the approved Stitch export).
+Visual source of truth: [DESIGN-SPEC.md](./design-spec.md) (derived from the approved Stitch export).
 
 ## Pages in the MVP
 
@@ -26,7 +26,7 @@ Auth-gated pages redirect to `/login` when the user is not signed in. `/onboardi
 
 ## Visual style
 
-All colour, typography, spacing, radius, borders, icons, and component rules are defined in [DESIGN-SPEC.md](DESIGN-SPEC.md). Implementation must reproduce the Stitch design as closely as reasonably possible.
+All colour, typography, spacing, radius, borders, icons, and component rules are defined in [DESIGN-SPEC.md](./design-spec.md). Implementation must reproduce the Stitch design as closely as reasonably possible.
 
 Nav shells:
 - **Desktop (≥ md)**: left `w-64` fixed side nav with items **Today · Plan · Subjects · Settings**.
