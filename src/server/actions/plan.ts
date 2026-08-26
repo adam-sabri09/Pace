@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { generatePlan } from "@/server/llm/generate";
 import type { PlanInput } from "@/server/llm/schema";
+import { checkPlanFeasibility } from "@/server/llm/validate";
 import { utcToLocalParts } from "@/server/llm/time";
 import {
   diffSessionsForOverlay,
@@ -146,6 +147,14 @@ async function buildPlanInput(
   if (input.subjects.length === 0) {
     return { ok: false, error: "You need at least one subject to generate a plan." };
   }
+
+  // Pre-flight feasibility: catch impossible constraints (past/today exam
+  // date, or windows shorter than the session length) with a specific,
+  // actionable message before spending an LLM call that would return an
+  // empty plan.
+  const feasible = checkPlanFeasibility(input);
+  if (!feasible.ok) return feasible;
+
   return { ok: true, input, timeZone };
 }
 

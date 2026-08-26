@@ -18,17 +18,23 @@ const LocalDateTime = z
   );
 
 export const PlanOutputSchema = z.object({
-  sessions: z
-    .array(
-      z.object({
-        startsAt: LocalDateTime,
-        durationMinutes: z.number().int().positive().max(180),
-        subjectName: z.string().trim().min(1).max(200),
-        topicName: z.string().trim().min(1).max(200),
-        instruction: z.string().trim().min(1).max(60),
-      }),
-    )
-    .min(1, "Plan must contain at least one session."),
+  // NOTE: sessions may legitimately be empty. When the constraints make it
+  // impossible to fit even one session (e.g. an exam date that is today/past,
+  // or windows shorter than the session length), the model correctly returns
+  // an empty array. A `.min(1)` here caused the AI SDK to throw
+  // AI_NoObjectGeneratedError on that valid response, which surfaced as the
+  // opaque "We couldn't build a valid plan." Empty is handled explicitly in
+  // generate.ts (returns a clear, actionable message) and blocked earlier by
+  // the feasibility pre-check in validate.ts.
+  sessions: z.array(
+    z.object({
+      startsAt: LocalDateTime,
+      durationMinutes: z.number().int().positive().max(180),
+      subjectName: z.string().trim().min(1).max(200),
+      topicName: z.string().trim().min(1).max(200),
+      instruction: z.string().trim().min(1).max(60),
+    }),
+  ),
   warnings: z
     .array(
       z.object({
