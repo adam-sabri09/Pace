@@ -236,9 +236,11 @@ export function checkPlanFeasibility(
     windowsByDOW.set(w.dayOfWeek, list);
   }
 
-  // Using noon UTC as anchor so the date stays correct in any timezone.
-  const todayDate = new Date(todayDateStr + "T12:00:00Z");
-  const examDate = new Date(latestExam + "T12:00:00Z");
+  // Use local noon in the user's timezone as the anchor. The naive
+  // todayDateStr+"T12:00:00Z" approach shifted the calendar date forward by
+  // one day for UTC+12+ users (noon UTC = midnight+12h = next local day).
+  const todayDate = localWallClockToUTC(todayDateStr + "T12:00", input.timeZone);
+  const examDate = localWallClockToUTC(latestExam + "T12:00", input.timeZone);
   const daysToExam = Math.round((examDate.getTime() - todayDate.getTime()) / 86_400_000);
 
   // 7+ days guarantees every day-of-week appears at least once; check 2 already

@@ -135,6 +135,22 @@ describe("checkPlanFeasibility check 3 — short scheduling window", () => {
       ).ok,
     ).toBe(true);
   });
+
+  it("accepts a Monday slot for UTC+12 users (regression: noon-UTC anchor bug)", () => {
+    // Pacific/Auckland NZST = UTC+12. now = 2026-08-23T21:00Z = Mon 2026-08-24 09:00 local.
+    // The old anchor (todayDateStr+"T12:00:00Z") placed noon-UTC on Aug 24, which in UTC+12
+    // is midnight Aug 25 (Tuesday) — so d=0 was mapped to Tuesday, skipping Monday's slot
+    // and incorrectly returning { ok: false }.
+    expect(
+      checkPlanFeasibility({
+        timeZone: "Pacific/Auckland",
+        now: new Date("2026-08-23T21:00:00Z"),
+        sessionLengthMinutes: 45,
+        subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-25", topics: [] }],
+        availability: [{ dayOfWeek: 1, startsAt: "10:00", endsAt: "12:00" }],
+      }).ok,
+    ).toBe(true);
+  });
 });
 
 describe("PlanOutputSchema now permits an empty plan", () => {

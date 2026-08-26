@@ -2,11 +2,16 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { utcToLocalParts } from "@/server/llm/time";
+import {
+  computeSubjectProgress,
+  type SubjectProgressData,
+} from "@/lib/progress";
 
 /**
- * /plan — full timeline grouped by day (DESIGN-SPEC §3.8). Read-only in
- * Step 6; Complete/Missed live on /today. Past sessions render muted;
- * future days render at full opacity.
+ * /plan — full timeline grouped by day (DESIGN-SPEC §3.8).
+ *
+ * Shows a "Your subjects" progress section (per-subject exam countdown +
+ * session completion) above the existing day-by-day session timeline.
  */
 export default async function PlanPage() {
   const supabase = await createClient();
@@ -24,18 +29,65 @@ export default async function PlanPage() {
   if (profile?.session_length_minutes == null) redirect("/onboarding");
   const timeZone = profile?.time_zone ?? "UTC";
 
-  const { data: sessions } = await supabase
-    .from("sessions")
-    .select(
-      "id, starts_at, duration_minutes, instruction, status, topic:topics(name, subject:subjects(name))",
-    )
-    .eq("user_id", user.id)
-    .order("starts_at", { ascending: true });
-
   const now = new Date();
   const today = utcToLocalParts(now, timeZone).dateString;
 
-  // Group sessions by local date.
+  // Run all data queries in parallel.
+  const [
+    { data: sessions },
+    { data: rawSubjects },
+    { data: activePlan },
+  ] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select(
+        "id, starts_at, duration_minutes, instruction, status, topic:topics(name, subject:subjects(name))",
+      )
+      .eq("user_id", user.id)
+      .order("starts_at", { ascending: true }),
+    // Subjects with exam dates: nested topics → sessions so we can count progress.
+    supabase
+      .from("subjects")
+      .select("id, name, exam_date, topics(sessions(status))")
+      .eq("user_id", user.id)
+      .not("exam_date", "is", null)
+      .order("exam_date", { ascending: true }),
+    // Active plan warnings are stored as JSONB on the plan row.
+    supabase
+      .from("plans")
+      .select("warnings")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle(),
+  ]);
+
+  // Transform raw Supabase rows (untyped) into the shape computeSubjectProgress expects.
+  const warnings = (
+    activePlan?.warnings as
+      | Array<{ subjectName: string; topicName: string; message: string }>
+      | null
+  ) ?? [];
+
+  const subjectsForProgress = (rawSubjects ?? []).map((s) => ({
+    id: s.id as string,
+    name: s.name as string,
+    examDate: s.exam_date as string,
+    topics: (
+      (s.topics as Array<{
+        sessions: Array<{ status: string }>;
+      }> | null) ?? []
+    ).map((t) => ({
+      sessions: (t.sessions as Array<{ status: string }> | null) ?? [],
+    })),
+  }));
+
+  const subjectProgress = computeSubjectProgress(
+    subjectsForProgress,
+    warnings,
+    today,
+  );
+
+  // Group sessions by local date for the timeline.
   const groups = new Map<
     string,
     Array<{
@@ -102,6 +154,10 @@ export default async function PlanPage() {
         </p>
       </header>
 
+      {/* Subject progress section */}
+      <SubjectProgressSection subjects={subjectProgress} />
+
+      {/* Day-by-day timeline */}
       {hasAny ? (
         <div className="flex flex-col gap-stack-lg">
           {sortedDates.map((date) => {
@@ -118,14 +174,12 @@ export default async function PlanPage() {
                 </h2>
                 <ul className="flex flex-col gap-3">
                   {groups.get(date)!.map((s) => {
-                    const muted =
-                      s.status !== "scheduled" || past;
+                    const muted = s.status !== "scheduled" || past;
                     return (
                       <li
                         key={s.id}
                         className={
-                          "relative pl-6 " +
-                          (muted ? "opacity-70" : "")
+                          "relative pl-6 " + (muted ? "opacity-70" : "")
                         }
                       >
                         <span
@@ -148,8 +202,7 @@ export default async function PlanPage() {
                           <h3
                             className={
                               "font-headline-md text-headline-md text-on-surface " +
-                              (s.status === "completed" ||
-                              s.status === "missed"
+                              (s.status === "completed" || s.status === "missed"
                                 ? "line-through"
                                 : "")
                             }
@@ -161,7 +214,9 @@ export default async function PlanPage() {
                           </p>
                           {s.status !== "scheduled" && (
                             <p className="font-label-sm text-label-sm mt-1 tracking-wider uppercase text-outline">
-                              {s.status === "completed" ? "Completed" : "Missed"}
+                              {s.status === "completed"
+                                ? "Completed"
+                                : "Missed"}
                             </p>
                           )}
                         </div>
@@ -184,5 +239,136 @@ export default async function PlanPage() {
         </div>
       )}
     </main>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subject progress section
+// ---------------------------------------------------------------------------
+
+function SubjectProgressSection({
+  subjects,
+}: {
+  subjects: SubjectProgressData[];
+}) {
+  if (subjects.length === 0) return null;
+
+  return (
+    <section aria-labelledby="subject-progress-heading">
+      <h2
+        id="subject-progress-heading"
+        className="font-headline-md text-headline-md text-on-surface mb-stack-sm"
+      >
+        Your subjects
+      </h2>
+      <ul className="flex flex-col gap-3">
+        {subjects.map((s) => (
+          <li key={s.id}>
+            <SubjectProgressCard subject={s} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SubjectProgressCard({ subject }: { subject: SubjectProgressData }) {
+  const { name, completedSessions, totalSessions, progressPct, daysToExam, hasWarning } =
+    subject;
+
+  const countdownLabel =
+    daysToExam === 0
+      ? "Today"
+      : daysToExam > 0
+        ? `${daysToExam} day${daysToExam === 1 ? "" : "s"} to go`
+        : "Exam passed";
+
+  type StatusKey = "on-track" | "warning" | "exam-today" | "exam-passed";
+  const statusKey: StatusKey =
+    daysToExam < 0
+      ? "exam-passed"
+      : daysToExam === 0
+        ? "exam-today"
+        : hasWarning
+          ? "warning"
+          : "on-track";
+
+  const statusLabel: Record<StatusKey, string> = {
+    "on-track": "On track",
+    "warning": "Warning",
+    "exam-today": "Exam today",
+    "exam-passed": "Exam passed",
+  };
+
+  const statusCls: Record<StatusKey, string> = {
+    "on-track":
+      "bg-secondary-container text-on-secondary-container",
+    "warning": "bg-error-container text-on-error-container",
+    "exam-today": "bg-primary-container text-on-primary-container",
+    "exam-passed": "bg-surface-container text-on-surface-variant",
+  };
+
+  const sessionLabel =
+    totalSessions === 0
+      ? "No sessions scheduled"
+      : `${completedSessions} of ${totalSessions} session${totalSessions === 1 ? "" : "s"} done`;
+
+  return (
+    <article
+      className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4"
+      data-testid="subject-progress-card"
+      data-status={statusKey}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <h3 className="font-headline-md text-headline-md text-on-surface">
+            {name}
+          </h3>
+          {hasWarning && (
+            <p className="font-label-sm text-label-sm text-error flex items-center gap-1 mt-1">
+              <span
+                className="material-symbols-outlined text-[14px]"
+                aria-hidden="true"
+              >
+                warning
+              </span>
+              May not have enough time before the exam
+            </p>
+          )}
+        </div>
+        <div className="text-right shrink-0">
+          <p className="font-label-sm text-label-sm text-on-surface-variant mb-1">
+            {countdownLabel}
+          </p>
+          <span
+            className={
+              "font-label-sm text-label-sm px-2 py-0.5 rounded inline-block " +
+              statusCls[statusKey]
+            }
+          >
+            {statusLabel[statusKey]}
+          </span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div
+        className="h-2 bg-surface-container-highest rounded-full overflow-hidden mb-2"
+        role="progressbar"
+        aria-valuenow={progressPct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${name} progress: ${progressPct}%`}
+      >
+        <div
+          className="h-full bg-primary rounded-full"
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+
+      <p className="font-body-sm text-body-sm text-on-surface-variant">
+        {sessionLabel}
+      </p>
+    </article>
   );
 }

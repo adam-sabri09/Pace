@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import Link from "next/link";
 
 import {
   markDoneAction,
@@ -100,28 +101,36 @@ export function SessionCard({
           </div>
         </div>
         {isActive && (
-          <div className="flex gap-2 p-4 pt-0 sm:pt-4 border-t sm:border-t-0 sm:border-l border-outline-variant sm:w-48 sm:flex-col sm:justify-center">
-            <button
-              type="button"
-              onClick={runAction(markMissedAction)}
-              disabled={isPending}
-              aria-busy={isPending}
-              className="flex-1 sm:flex-none px-4 py-2 font-label-md text-label-md border border-outline text-on-surface rounded-lg hover:bg-surface-variant transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          <div className="flex flex-col gap-2 p-4 pt-0 sm:pt-4 border-t sm:border-t-0 sm:border-l border-outline-variant sm:w-48 sm:justify-center">
+            <Link
+              href={`/study/${id}`}
+              className="w-full text-center px-4 py-2 font-label-md text-label-md bg-primary text-on-primary rounded-lg hover:opacity-90 transition-opacity"
             >
-              Missed
-            </button>
-            <button
-              type="button"
-              onClick={runAction(markDoneAction)}
-              disabled={isPending}
-              aria-busy={isPending}
-              className="flex-1 sm:flex-none px-4 py-2 font-label-md text-label-md bg-primary-container text-on-primary rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                check_circle
-              </span>
-              Complete
-            </button>
+              Start session
+            </Link>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={runAction(markMissedAction)}
+                disabled={isPending}
+                aria-busy={isPending}
+                className="flex-1 px-3 py-2 font-label-sm text-label-sm border border-outline text-on-surface-variant rounded-lg hover:bg-surface-variant transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Missed
+              </button>
+              <button
+                type="button"
+                onClick={runAction(markDoneAction)}
+                disabled={isPending}
+                aria-busy={isPending}
+                className="flex-1 px-3 py-2 font-label-sm text-label-sm bg-primary-container text-on-primary rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                  check_circle
+                </span>
+                Complete
+              </button>
+            </div>
           </div>
         )}
       </div>

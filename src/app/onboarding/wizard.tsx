@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducer, useState, useTransition } from "react";
+import { useEffect, useReducer, useState, useTransition } from "react";
 
 import {
   DAYS_OF_WEEK,
@@ -11,6 +11,7 @@ import {
   type SessionLength,
 } from "@/lib/validation/onboarding";
 import { commitOnboardingAction } from "@/server/actions/onboarding";
+import { suggestTopicsAction } from "@/server/actions/suggestions";
 
 /**
  * Onboarding wizard — client state machine.
@@ -422,6 +423,39 @@ function TopicsStep({
   state: State;
   dispatch: React.Dispatch<Action>;
 }) {
+  const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
+  const [suggestionsLoading, setSuggestionsLoading] = useState(true);
+
+  const subjectNames = state.subjects.map((s) => s.name);
+  const subjectNamesKey = subjectNames.join("||");
+
+  useEffect(() => {
+    if (subjectNames.length === 0) {
+      const id = setTimeout(() => setSuggestionsLoading(false), 0);
+      return () => clearTimeout(id);
+    }
+
+    let cancelled = false;
+    const id = setTimeout(() => {
+      setSuggestionsLoading(true);
+      suggestTopicsAction(subjectNames)
+        .then((result) => {
+          if (!cancelled) {
+            setSuggestions(result);
+            setSuggestionsLoading(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setSuggestionsLoading(false);
+        });
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectNamesKey]);
+
   return (
     <section>
       <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
@@ -433,7 +467,13 @@ function TopicsStep({
 
       <div className="space-y-stack-lg">
         {state.subjects.map((s) => (
-          <SubjectTopics key={s.clientId} subject={s} dispatch={dispatch} />
+          <SubjectTopics
+            key={s.clientId}
+            subject={s}
+            dispatch={dispatch}
+            suggestions={suggestions[s.name]}
+            suggestionsLoading={suggestionsLoading}
+          />
         ))}
       </div>
     </section>
@@ -443,9 +483,13 @@ function TopicsStep({
 function SubjectTopics({
   subject,
   dispatch,
+  suggestions,
+  suggestionsLoading,
 }: {
   subject: SubjectDraft;
   dispatch: React.Dispatch<Action>;
+  suggestions: string[] | undefined;
+  suggestionsLoading: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const add = () => {
@@ -453,6 +497,24 @@ function SubjectTopics({
     dispatch({ type: "ADD_TOPIC", subjectClientId: subject.clientId, name: draft });
     setDraft("");
   };
+
+  const addedNames = new Set(subject.topics.map((t) => t.name.toLowerCase()));
+
+  const handleChipClick = (name: string) => {
+    const existing = subject.topics.find(
+      (t) => t.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (existing) {
+      dispatch({
+        type: "REMOVE_TOPIC",
+        subjectClientId: subject.clientId,
+        topicClientId: existing.clientId,
+      });
+    } else {
+      dispatch({ type: "ADD_TOPIC", subjectClientId: subject.clientId, name });
+    }
+  };
+
   return (
     <div>
       <h2 className="font-label-md text-label-md uppercase tracking-wider text-outline mb-3">
@@ -506,6 +568,62 @@ function SubjectTopics({
           <span className="material-symbols-outlined">add_circle</span>
         </button>
       </div>
+
+      {/* AI suggestions */}
+      {suggestionsLoading && (
+        <div
+          className="flex flex-wrap gap-2 mt-3"
+          aria-label="Loading suggestions"
+        >
+          {[88, 110, 76, 96].map((w) => (
+            <div
+              key={w}
+              className="h-8 rounded-full bg-surface-container-highest animate-pulse"
+              style={{ width: `${w}px` }}
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+      )}
+      {!suggestionsLoading && suggestions && suggestions.length > 0 && (
+        <div className="mt-3">
+          <p className="font-label-sm text-label-sm text-outline mb-2">
+            Suggestions
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[...new Set(suggestions)].map((name) => {
+              const isAdded = addedNames.has(name.toLowerCase());
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => handleChipClick(name)}
+                  aria-label={
+                    isAdded
+                      ? `Remove suggestion ${name}`
+                      : `Add suggestion ${name}`
+                  }
+                  aria-pressed={isAdded}
+                  className={
+                    "inline-flex items-center gap-1 px-3 py-1.5 rounded-full font-label-sm text-label-sm border transition-colors " +
+                    (isAdded
+                      ? "bg-secondary-container text-on-secondary-container border-secondary-container"
+                      : "bg-surface border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary")
+                  }
+                >
+                  <span
+                    className="material-symbols-outlined text-[14px]"
+                    aria-hidden="true"
+                  >
+                    {isAdded ? "check" : "add"}
+                  </span>
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
