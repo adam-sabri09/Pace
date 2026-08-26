@@ -93,9 +93,5 @@ export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
   if (second.error === NO_FEASIBLE_SESSIONS || first.error === NO_FEASIBLE_SESSIONS) {
     return { ok: false, error: NO_FEASIBLE_SESSIONS };
   }
-  return {
-    ok: false,
-    error:
-      "We couldn't build a plan that fits your available time. Try adding more availability, reducing topics, or moving your exam date.",
-  };
+  return { ok: false, error: first.error };
 }
