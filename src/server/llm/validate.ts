@@ -241,46 +241,26 @@ export function checkPlanFeasibility(
   const examDate = new Date(latestExam + "T12:00:00Z");
   const daysToExam = Math.round((examDate.getTime() - todayDate.getTime()) / 86_400_000);
 
-  // DIAGNOSTIC — remove once the check-3 false-rejection is confirmed.
-  // Logs go to Vercel function logs (stderr); nothing reaches the client.
-  console.error("[pace:check3-diag]", JSON.stringify({
-    now: input.now.toISOString(),
-    timeZone: input.timeZone,
-    todayDateStr,
-    todayMinutes,
-    latestExam,
-    daysToExam,
-    sessionLengthMinutes: input.sessionLengthMinutes,
-    availability: input.availability,
-    earlyReturn: daysToExam >= 7,
-  }));
-
   // 7+ days guarantees every day-of-week appears at least once; check 2 already
   // confirmed a sufficient-length window exists, so feasibility is certain.
   if (daysToExam >= 7) return { ok: true };
 
   // Short range: walk day-by-day and confirm at least one session can fit.
   let hasFeasibleSlot = false;
-  const loopTrace: Array<{ d: number; dateUTC: string; computedDOW: number; windowsFound: boolean; slotOk: boolean }> = [];
   for (let d = 0; d <= daysToExam && !hasFeasibleSlot; d++) {
     const dayDate = new Date(todayDate.getTime() + d * 86_400_000);
     const { dayOfWeek } = utcToLocalParts(dayDate, input.timeZone);
     const windows = windowsByDOW.get(dayOfWeek);
-    let slotOk = false;
-    if (windows) {
-      slotOk = windows.some((w) => {
-        if (d === 0) {
-          // Today: session must start at or after the current local time.
-          return w.endsAt - input.sessionLengthMinutes >= todayMinutes;
-        }
-        // Future day: window must be long enough for a full session.
-        return w.endsAt - w.startsAt >= input.sessionLengthMinutes;
-      });
-    }
-    loopTrace.push({ d, dateUTC: dayDate.toISOString(), computedDOW: dayOfWeek, windowsFound: !!windows, slotOk });
-    if (slotOk) hasFeasibleSlot = true;
+    if (!windows) continue;
+    hasFeasibleSlot = windows.some((w) => {
+      if (d === 0) {
+        // Today: session must start at or after the current local time.
+        return w.endsAt - input.sessionLengthMinutes >= todayMinutes;
+      }
+      // Future day: window must be long enough for a full session.
+      return w.endsAt - w.startsAt >= input.sessionLengthMinutes;
+    });
   }
-  console.error("[pace:check3-loop]", JSON.stringify({ loopTrace, hasFeasibleSlot }));
 
   if (!hasFeasibleSlot) {
     return {
