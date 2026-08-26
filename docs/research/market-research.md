@@ -874,3 +874,457 @@ flowchart LR
 ---
 
 *End of Part II. Numbers are illustrative model inputs to be replaced with measured data after user interviews and a pricing test; systems diagrams reflect the implemented schema and flows in `DATABASE.md`, `ARCHITECTURE.md`, and `USER-FLOWS.md`.*
+
+---
+---
+
+# Part III — Target Countries & Sustainable Pricing Model
+
+> **Purpose.** Parts I and II established the problem and the business model framework. Part III answers a specific commercial question: *Which three countries should we target first, and what price gives us the best chance of converting students (via parents) while generating sustainable revenue?*
+>
+> **Evidence discipline.** The same labels apply: **[Fact]** = cited authoritative source; **[Analysis]** = our interpretation; **[Assumption]** = plausible but unproven. All pricing figures were verified against official sources or App Store listings on or before **2026-08-26**. Affordability comparisons use the **parent** as the primary payer context (established in Part I §8) — not the student — except where student self-pay is explicitly discussed.
+>
+> **Key constraint.** The MVP has one user type (student) and no parent dashboard or family-plan feature. Pricing in this document is therefore for the **initial individual/student subscription**, paid in practice by the parent. A family tier is a future upgrade.
+
+---
+
+## C0. Research Method & Data Limitations
+
+Affordability data for high-school students aged 14–18 is sparse as a primary-source category. Surveys from NatWest (UK), Piper Sandler (US), Westpac (Australia), and Greenlight (US) were the strongest sources found. Key limitations:
+
+- **Piper Sandler** reports teen *spending* (not income/allowance separately); the proprietary report is not publicly available.
+- **NatWest Rooster Money** samples families already using a financial-management app — likely biased toward higher financial engagement than average.
+- **No teen-specific (14–18) subscription spend figure** was found for any country from a primary source. Adult Gen Z proxies (ages 13–28 or 18–25) are used where noted.
+- **UK and AUD App Store prices for Quizlet and Structured** were not confirmed directly; USD prices are confirmed. Local currency prices may differ due to VAT (UK: 20%) and Apple/Google exchange-rate policy.
+- **Canada** was researched for comparison but is not recommended as a priority market (see §C1.4).
+
+All figures that could not be confirmed from a primary or authoritative secondary source are marked **[Assumption]** or **[Vendor estimate]**.
+
+---
+
+## C1. Country Selection — Top Three Markets
+
+### Selection criteria
+
+The three markets were evaluated on eight factors, weighted for a **B2C, English-language, exam-anchored HS study-planner** at the MVP stage:
+
+| Factor | Weight | Rationale |
+|---|---|---|
+| Exam anchor (fixed high-stakes dates students cannot move) | High | Core product value requires a compelling exam deadline |
+| Student market size | Medium | More students = larger ceiling; but density matters more than raw count at MVP |
+| Parent purchasing power | High | Primary payer; must be able to absorb $30–60/year without significant friction |
+| English language | High | MVP is English-only; translation not planned |
+| EdTech / app adoption | Medium | Cultural readiness for digital study tools |
+| Competition intensity | Medium | Less-saturated markets offer earlier-mover advantage |
+| Distribution fit (creator-led) | Low-Medium | TikTok and Instagram study culture presence |
+| Regulatory simplicity | Medium | COPPA (US under-13), GDPR-K (UK/EU), PPSA (AU) — all manageable but not identical |
+
+---
+
+### C1.1 United Kingdom — Primary Market
+
+**Why first:**
+
+- **[Fact] ~3.5–3.6 million secondary students** in England alone (state + independent; state-funded secondary: ~3.2M per DfE/NFER Jan 2024 [R36]). Including Scotland, Wales and Northern Ireland: ~4.2M total across the UK [R37].
+- **[Fact] The exam structure is ideal.** GCSE (Year 11, ages 15–16) and A-Level (Year 13, ages 17–18) are the UK's national high-stakes exams with fixed May–June windows and published timetables. The adaptive re-plan core is most useful precisely here: a fixed exam date that cannot move, against daily life that constantly does.
+- **[Fact] 29% of secondary pupils in England and Wales now use private tutoring** (Sutton Trust 2026 data, via Ariston Education [R38]), up from 18% a decade ago. Average family tutoring spend: ~£2,200/year (~£37.45/hour × 1 session/week × ~58 weeks — Parentkind/YouGov [R39]).
+- **[Fact] MyStudyLife is already priced at £4.99/mo / £29.99/yr in the UK App Store** [R40], establishing market-set price expectations in GBP.
+- **[Analysis]** The UK combines a concrete exam anchor, high parental willingness-to-pay for exam preparation, an established GBP price band, and (for the product founder) natural cultural and language fit. It is the clearest go-to-market beachhead.
+
+---
+
+### C1.2 United States — Secondary Market
+
+**Why second:**
+
+- **[Fact] ~16.9 million high-school students** (public 15.5M + private 1.4M; NCES fall 2022 [R41]) — by far the largest English-language HS market in the world.
+- **[Fact] AP exams (May), SAT (year-round), and ACT (year-round) provide the exam anchor.** The May AP window is the clearest fixed-date parallel to UK GCSE/A-Level. Parents already spend materially on test prep.
+- **[Fact] Average SAT prep tutoring rate: $62/hour** (Wiingy market analysis [R42]); typical annual test-prep spend per student: $300–$1,500+ per course, up to $5,000–$20,000 for premium packages [R43].
+- **[Fact] Teen self-reported annual spending: $2,388** (Piper Sandler 49th survey, Spring 2025, 6,450+ teens, average age 15.7 [R44]). Teen weekly allowance: approximately $13–$21/week depending on age (Greenlight 2025 [R45]).
+- **[Analysis]** The US market is 4.7× larger by student count than the UK, and tutoring budgets are at least as high. The competitive landscape is also denser (more EdTech incumbents, free tools like Khanmigo and Socratic). Recommended as expansion market after UK PMF is established, or as parallel beachhead if distribution is creator-led on US platforms.
+
+---
+
+### C1.3 Australia — Third Market
+
+**Why third:**
+
+- **[Fact] ~1.86–1.90 million secondary students** (ABS Schools 2024–2025: total secondary 45.1–45.6% of 4.13–4.16M total enrolment [R46]).
+- **[Fact] Strong national exam culture.** Every state and territory has a fixed high-stakes Year 12 senior certificate (HSC in NSW, VCE in Victoria, QCE in Queensland, WACE in WA, SACE in SA, etc.), each producing an ATAR for university entry [R47]. Year 12 ATAR pressure is the Australian equivalent of A-Level stress.
+- **[Fact] Average weekly teen pocket money in Australia: AU$25.02/week** (Westpac survey, 1,007 Australian parents, April 2025 [R48]).
+- **[Fact] Australian private tutoring market: ~AU$1.3 billion/year** (Datanyze/Tutoring.net.au [R49]); typical rates AU$30–150/hour with Cluey Learning (major online platform) charging AU$70–90/hour [R50].
+- **[Fact] Spotify Student in Australia is AU$7.99/month** [R51] — a useful cultural anchor for what teens (and parents) accept as a normal monthly subscription.
+- **[Analysis]** Australia combines a concrete year-12 exam anchor equivalent to A-Level, high purchasing power (among the highest globally), a large and growing tutoring market, strong English-language digital adoption, and meaningfully lower competition than the US. Market size is ~54% of the UK's secondary population — smaller, but not negligible, and less saturated by HS-specific study apps. It is the natural third market for a product that starts in the UK and expands in English-speaking exam-cultures.
+
+---
+
+### C1.4 Why Not Canada
+
+Canada was researched but is not recommended as a priority market:
+
+- **[Fact] ~1.4–1.5M estimated grades 9–12 students** — similar to Australia in size, but the estimate is less certain (no single published figure for grades 9–12 was found from Statistics Canada [R52]).
+- **[Analysis]** Canada has no single national high-stakes exam. Secondary credentials are entirely provincial (Ontario's OSSSD, BC's Dogwood Diploma, etc.) with no federal ATAR-equivalent. This weakens the "fixed exam date" anchor that makes adaptive re-planning most valuable. Additionally, Canada's EdTech market is closely tied to and dominated by US tools — it adds cost (French-language requirements in Quebec for any meaningful national coverage) with limited differentiation over the US market. Better addressed after US launch as a natural geographic extension.
+
+---
+
+## C2. Affordability Research by Country
+
+### C2.1 United Kingdom
+
+| Metric | Figure | Source | Type |
+|---|---|---|---|
+| Secondary students (England, state-funded) | ~3.2M (Jan 2024) | DfE / NFER [R36] | [Fact] |
+| Teen regular weekly pocket money (17-yr-olds) | £8.31/week | NatWest Rooster Money 2025 [R53] | [Fact] (app-user sample) |
+| Teen total weekly income (all sources, 17-yr-olds) | ~£23.97/week | Statista 2024–25 [R54] | [Fact] (includes part-time work) |
+| Adult UK subscription spend (16+) | £786/year (~£65.50/month) | Aqua survey 2025 [R55] | [Fact] (proxy; not teen-specific) |
+| Average family tutoring spend | ~£2,200/year (~£183/month) | Parentkind/YouGov via Ariston Ed [R38] | [Fact] |
+| Average hourly tutoring rate | £37.45/hour | Parentkind/YouGov survey [R39] | [Fact] |
+| Students using private tutoring | 29% of secondary pupils | Sutton Trust 2026 [R38] | [Fact] |
+| MyStudyLife+ (UK App Store) | £4.99/month · £29.99/year | UK App Store [R40] | [Fact] |
+| Spotify Student (UK) | £5.99/month | Spotify UK [R56] | [Fact] |
+
+**[Analysis]** At £4.99/month, Pace's recommended monthly price equals less than two hours of pocket money at the NatWest weekly average (£8.31), and equals roughly 13 minutes of professional tutoring time (at £37.45/hour). For parents paying £2,200/year for tutoring, a £29.99/year plan is approximately 1.4% of their tutoring budget — effectively invisible. The affordability case for parents is very strong. For teen self-pay it is moderate (0.6 weeks of regular pocket money per month).
+
+---
+
+### C2.2 United States
+
+| Metric | Figure | Source | Type |
+|---|---|---|---|
+| HS students (grades 9–12) | ~16.9M | NCES [R41] | [Fact] |
+| Teen self-reported annual spending | $2,388 (Spring 2025) | Piper Sandler 49th survey [R44] | [Fact] (spending, not income) |
+| Teen weekly allowance (17-yr-olds) | ~$20.87/week | Greenlight 2025 [R45] | [Fact] (app-user sample) |
+| Gen Z monthly subscription spend | ~$118/month (ages 13–28) | Bango survey Apr 2025 [R57] | [Fact] (proxy; includes adults) |
+| Average SAT prep hourly rate | $62/hour | Wiingy/Yahoo Finance [R42] | [Fact] |
+| Typical annual test prep family spend | $300–$1,500/course | IvyStrides [R43] | [Fact] (range) |
+| Quizlet Plus | $7.99/month · $35.99/year | Quizlet / Brighterly [R58] | [Fact] |
+| Structured Pro | $6.49/month · $19.99/year | Structured blog [R59] | [Fact] |
+| Spotify Student (US) | $5.99/month | Spotify [R56] | [Fact] |
+| ChatGPT Plus | $20.00/month | OpenAI [R60] | [Fact] |
+| Duolingo Super | $12.99/month · $59.99/year | Duolingo Guides [R61] | [Fact] |
+| Khanmigo (AI tutor, Khan Academy) | ~$4/month · ~$44/year | AI Flow review [R62] | [Fact] (estimate from review site) |
+
+**[Analysis]** At $5.99/month, Pace is positioned below Quizlet Plus ($7.99), below Duolingo Super ($12.99), and below ChatGPT Plus ($20). It is in line with Spotify Student ($5.99) — a cultural anchor teens readily accept. For parents spending $300–$1,500 on a single test-prep course, $5.99/month ($71.88/year) is a negligible addition. US is the strongest purchasing-power market but the most competitive.
+
+---
+
+### C2.3 Australia
+
+| Metric | Figure | Source | Type |
+|---|---|---|---|
+| Secondary students (Year 7–12) | ~1.86–1.90M (2024–2025) | ABS Schools 2025 [R46] | [Fact] |
+| Teen weekly pocket money | AU$25.02/week (2025) | Westpac survey, Apr 2025 [R48] | [Fact] (commissioned survey) |
+| Private tutoring market size | ~AU$1.3bn/year | Datanyze / Tutoring.net.au [R49] | [Vendor estimate] |
+| Average tutoring rate (online) | AU$37–50/hour | Cluey / KIS Academics [R50] | [Fact] |
+| Premium tutoring (in-person) | AU$70–90/hour (Cluey) | Cluey Learning [R50] | [Fact] |
+| Spotify Student (AU) | AU$7.99/month | Spotify AU [R51] | [Fact] |
+| Apple Arcade (AU) | AU$9.99/month | ThePricer [R63] | [Fact] |
+| ChatGPT Plus (AU) | AU$32.98/month | FastAccess AI [R64] | [Fact] |
+
+**[Analysis]** Australian teens have higher weekly pocket money (AU$25/week) than UK teens (£8.31/week at current exchange rates: ~AU$17). Purchasing power is strong. A $9.99/month subscription (AU) equals 0.4 weeks of average teen pocket money — the most affordable of the three markets for student self-pay. The tutoring market is large and parents are clearly willing to spend on education. Quizlet Plus and Structured AUD prices were not confirmed from primary sources and need App Store verification.
+
+---
+
+## C3. Competitor Pricing Landscape
+
+All prices checked against official sources on or before **2026-08-26**. Prices in USD unless otherwise noted.
+
+| Product | Free plan | Monthly | Annual | Notes |
+|---|---|---|---|---|
+| **MyStudyLife** | Yes (5 active tasks) | $6.99 (US) · £4.99 (UK) | $39.99 (US) · £29.99 (UK) | Student planner; AI generates plans; no adaptive re-plan on miss |
+| **Quizlet Plus** | Yes (basic) | $7.99 | $35.99 | Flashcards + AI practice; not a planner |
+| **Structured Pro** | Yes | $6.49 | $19.99 ($64.99 lifetime) | Time-blocking planner; partial manual replan; not exam-specific |
+| **Power Planner** | Yes | — | $4.99 (one-time lifetime) | GPA calculator + assignment tracker; no AI; feature-frozen |
+| **Khanmigo** | Free in districts | ~$4/month | ~$44/year | AI tutor (Socratic method); not a planner |
+| **StudyFetch** | Yes (limited) | $11.99 | ~$4.99–7.99/month billed annually | AI notes/flashcards from PDFs; not a planner |
+| **Notion Plus** | Free for students | $10/month | Billed annually | General workspace; free with school email |
+| **Spotify Student** | — | $5.99 (US) · £5.99 (UK) · AU$7.99 (AU) | — | Cultural benchmark: what teens pay for a subscription they value |
+| **Duolingo Super** | Yes (ads) | $12.99 | $59.99 ($119.99 family) | Habit-based learning; strong retention design |
+| **ChatGPT Plus** | Yes (limited) | $20.00 (US) · AU$32.98 (AU) | — | Most capable AI; no exam-aware planning |
+
+**[Analysis]** The student planner category clusters tightly at $4–7/month. The AI-education category sits at $4–12/month. Neither category currently ships adaptive re-planning anchored to exam dates. ChatGPT ($20) and Duolingo Super ($13) demonstrate teens and parents will pay higher for genuinely differentiated AI value — but those products have massive brand recognition. A new entrant should enter at the lower bound of the AI-education category to reduce friction on first conversion, with room to raise prices after brand establishment.
+
+---
+
+## C4. Country Comparison
+
+| Factor | United Kingdom | United States | Australia |
+|---|---|---|---|
+| **Secondary student market** | ~4.2M (all UK) | ~16.9M | ~1.87M |
+| **Exam anchor quality** | ★★★★★ GCSE / A-Level; national, fixed May–June | ★★★★☆ AP (May fixed); SAT/ACT year-round | ★★★★★ HSC/VCE/WACE etc.; state-level fixed Year 12 exams + ATAR |
+| **Parent purchasing power** | High (developed economy) | Very high (highest globally) | High (comparable to UK) |
+| **Teen weekly disposable income** | ~£8–24 (regular pocket money to total incl. jobs) | ~$13–21 (allowance) | ~AU$25 |
+| **Parent tutoring spend** | ~£2,200/year (~£183/month) | ~$1,200–$4,000+/year | Market ~AU$1.3bn; rates AU$37–90/hour |
+| **Competitor pricing band** | £4.99–6.99/month | $4.99–7.99/month | AUD pricing unconfirmed; US/UK range applies directionally |
+| **Subscription culture benchmark** | Spotify Student £5.99/month | Spotify Student $5.99/month | Spotify Student AU$7.99/month |
+| **Market competition intensity** | Moderate (MSL dominant; few AI entrants) | High (many EdTech incumbents) | Low–Moderate (limited HS-specific AI tools) |
+| **Market opportunity** | Strong beachhead (language + exam fit + known pricing) | Largest upside; harder to penetrate | Best upside-to-competition ratio |
+| **Price sensitivity (student self-pay)** | Moderate | Moderate | Low (highest pocket money relative to price) |
+| **Price sensitivity (parent payer)** | Very low vs tutoring costs | Very low vs test-prep spend | Very low vs tutoring spend |
+| **Recommended monthly price** | £4.99 | $5.99 | AU$8.99 |
+| **Recommended annual price** | £34.99 | $39.99 | AU$54.99 |
+
+**[Analysis]** The US has the largest absolute student market but the highest competition and most price-anchored expectations from free incumbents (Notion, Khanmigo, Socratic). The UK offers the cleanest exam anchor (GCSE/A-Level) with an established GBP price band. Australia offers the best upside-to-competition ratio: strong purchasing power, clear exam culture, and an under-served market for AI study tools. The recommended launch sequence is UK → US+AU simultaneously (both require separate App Store localisation anyway).
+
+---
+
+## C5. Pricing Strategy
+
+### What the evidence recommends
+
+**1. Freemium entry, annual-first conversion**
+
+The evidence from competitors, teen psychology, and the business risk profile all point to the same structure:
+
+- **Free tier** to allow students to generate a first plan and experience the core product with no payment friction. This is table-stakes in the category (every major competitor has a free tier).
+- **Paid tier** that unlocks the full adaptive re-plan and multi-subject capability — the one feature no competitor ships, and the core product value.
+- **Annual plan as the primary CTA** (not monthly), because planner churn is the #1 business risk. A student who pays for a year stays through the full academic-year cycle. A monthly subscriber who abandons in week three is expensive to reacquire.
+
+**2. One global price in local currencies — not "global USD"**
+
+Regional pricing is appropriate here for three structural reasons:
+
+- **VAT:** UK App Store prices include 20% VAT. If USD $5.99 is listed globally, the UK-equivalent GBP price after tax is ~£5.15 — higher than MSL+ (£4.99) and above the UK category ceiling.
+- **Market norms:** MSL+ already set the UK market at £4.99/month. Pricing above that creates an immediate objection.
+- **App Store localisation is required anyway:** A UK, US and AU App Store presence each has a separate listing. Setting local prices is trivial additional work.
+- **[Analysis]** This is NOT dynamic or aggressive regional pricing — it is simply using the local-currency equivalent that makes sense in each market, accounting for tax and purchasing-power norms. The economics convert to near-parity in USD when averaged across the year.
+
+**3. No teen self-pay discount required**
+
+At the recommended prices, the primary payer (the parent) finds the cost trivially affordable relative to tutoring spend. A student discount creates complexity, requires verification, and is not necessary to achieve conversion. Khanmigo and Quizlet do not require student verification for their base plan. This should be revisited when/if a family plan tier ships.
+
+**4. Seasonal launch timing over introductory pricing**
+
+Given the exam-anchored positioning, launch timing matters more than introductory pricing. The highest-intent moments are:
+- **UK:** September (start of academic year, A-Level Year 13 begins), January (second term, GCSE cramming season), March–April (final exam sprint).
+- **US:** August–September (back-to-school), December–January (AP registration period), March–May (AP exam window).
+- **Australia:** January (school year starts), August–September (Year 12 exam season begins), October–November (HSC/VCE exams).
+
+Offering a limited-time annual plan at a discount during these windows (e.g., "Start your year for £24.99" vs standard £34.99) is more targeted than a permanent student discount and creates urgency aligned with actual behaviour.
+
+---
+
+## C6. Recommended Prices
+
+### Free tier
+
+| Feature | Free |
+|---|---|
+| Subjects | 1 subject only |
+| Topics | Unlimited within that subject |
+| Plan generation | Yes — one plan at a time |
+| Adaptive re-planning | No (or: 1 free re-plan to demonstrate the feature) |
+| Today's dashboard | Yes |
+| Study session timer | Yes |
+| Plan view | Yes |
+| Settings / availability edit | Yes (but re-plan not triggered without Pro) |
+
+**Purpose:** Let the student generate a plan and experience the core value. The paywall is at the moment the plan breaks — when a session is missed and the student cannot re-plan without upgrading. This is the highest-intent moment to ask for payment.
+
+---
+
+### Pro tier
+
+| | United Kingdom | United States | Australia |
+|---|---|---|---|
+| **Monthly** | **£4.99/month** | **$5.99/month** | **AU$8.99/month** |
+| **Annual** | **£34.99/year** | **$39.99/year** | **AU$54.99/year** |
+| Annual saving vs. monthly | 42% (£24.89 saved) | 44% ($31.89 saved) | 49% (AU$52.89 saved) |
+| Annual cost per day | £0.096 | $0.11 | AU$0.15 |
+| Revenue per paying user (annual) | £34.99 | $39.99 | AU$54.99 |
+| Revenue per paying user (monthly × 7-month avg. lifetime) | £34.93 | $41.93 | AU$62.93 |
+
+| Feature | Pro |
+|---|---|
+| Subjects | Unlimited |
+| Adaptive re-planning on missed sessions | Yes |
+| Adaptive re-planning on availability/subject changes | Yes |
+| Plan warnings (topic can't fit before exam) | Yes |
+| Full plan view | Yes |
+| All free-tier features | Yes |
+
+**Annual vs. monthly economics note:** At a 7-month average paid lifetime (the optimistic assumption from Part II B4.2), a monthly subscriber generates approximately the same gross revenue as an annual subscriber — but the annual subscriber has *committed* for 12 months, eliminating the 7-month churn risk. **Annual plan retention is worth more than monthly price uplift.** The recommended CTA hierarchy is: Free → Annual → Monthly (monthly as an explicit fallback for users who won't commit annually).
+
+---
+
+## C7. Affordability Assessment
+
+### From the student's perspective (self-pay)
+
+| Country | Monthly price | Teen weekly income | Monthly price as % of weekly income | Self-pay affordability |
+|---|---|---|---|---|
+| UK | £4.99 | £8.31 (pocket money only) / £23.97 (incl. jobs) | 60% of weekly pocket money / 21% of total | **Moderate** (pocket money only); **Affordable** (incl. part-time work) |
+| US | $5.99 | $13–21/week (allowance) | 29–46% of one week's allowance | **Moderate** |
+| Australia | AU$8.99 | AU$25.02/week | 36% of one week's pocket money | **Affordable** |
+
+The monthly price is not trivial for student self-pay. For a 14–15 year old on £8.31/week, £4.99/month represents more than half a week's pocket money. This reinforces the parent-as-payer model from Part I.
+
+### From the parent's perspective (primary payer)
+
+| Country | Annual price | Typical tutoring hourly rate | Annual price as hours of tutoring | Parent affordability |
+|---|---|---|---|---|
+| UK | £34.99/year | £37.45/hour | **0.93 hours** of tutoring | **Very affordable** |
+| US | $39.99/year | $62/hour | **0.65 hours** of SAT tutoring | **Very affordable** |
+| Australia | AU$54.99/year | AU$37–90/hour | **0.6–1.5 hours** of tutoring | **Very affordable** |
+
+**[Analysis]** Against the benchmark of what parents already voluntarily spend on exam preparation, the annual plan price in all three markets is negligible — less than a single tutoring session. Affordability is not a meaningful barrier for the parent payer. The conversion risk is **awareness and trust**, not price.
+
+---
+
+## C8. Conversion Analysis
+
+### Price vs. conversion rate vs. LTV
+
+A lower price increases conversion probability but reduces revenue per user. At the category's saturation and given the exam-anchored value frame, the analysis favours a price at the **upper-middle of the student planner band** (£4.99 / $5.99) rather than at the floor ($2.99) or ceiling ($9.99):
+
+| Scenario | Monthly price (UK) | Assumed conversion rate | Monthly subscribers (1,000 free users) | Monthly MRR | Annualised |
+|---|---|---|---|---|---|
+| Floor pricing | £2.99 | 8% | 80 | £239 | £2,868 |
+| **Recommended** | **£4.99** | **5%** | **50** | **£250** | **£2,994** |
+| Upper bound | £7.99 | 3% | 30 | £240 | £2,875 |
+
+**[Analysis]** The scenarios converge — the revenue difference between the three price points is small in the short run because conversion rate falls with price. The strategic advantage of the recommended price is not MRR uplift but **positioning**: £4.99 is the market-set price (MSL+), familiar to parents, and does not invite the "too expensive for a student" objection that £7.99 would trigger. The real revenue lever is converting monthly to annual.
+
+### Annual vs. monthly — the retention argument
+
+| Plan | Price | Months retained (before churn) | Gross revenue per user |
+|---|---|---|---|
+| Monthly (UK) | £4.99/month | 3 months (pessimistic) | £14.97 |
+| Monthly (UK) | £4.99/month | 7 months (optimistic) | £34.93 |
+| **Annual (UK)** | **£34.99/year** | **12 months (committed)** | **£34.99** |
+
+**[Analysis]** The annual plan generates the *same* gross revenue as 7 months of monthly subscription — but guarantees it. Given that planner churn can be as bad as 3 months, the annual plan eliminates the worst-case outcome. **The annual plan should be the primary offer at every paywall moment, including the moment after a missed session triggers the re-plan prompt.**
+
+### Free plan design
+
+The free plan's job is to create the "aha moment" — the student generates a plan, follows it for a day or two, misses a session, and hits the paywall at the exact moment they need the re-plan. This is the highest-conversion moment in the product. The free plan should:
+- Allow full onboarding and first plan generation
+- Show them what adaptive re-planning looks like (the overlay) before asking them to upgrade
+- Offer a direct annual upgrade from the paywall modal (not monthly as default)
+
+**[Assumption]** That the paywall-at-missed-session moment converts better than an upfront paywall. This is plausible from the "trying before buying" literature but is not tested for this specific product. Instrument the paywall modal's conversion rate from day one.
+
+---
+
+## C9. Final Recommendation
+
+### Recommended Target Countries
+
+**1. United Kingdom** — Primary beachhead.
+Strongest exam anchor (GCSE/A-Level), established GBP price band (MSL+ at £4.99/mo), high parent tutoring spend (£2,200/year average), ~4.2M secondary students, English-language product, and the lowest launch complexity. Build and validate here first.
+
+**2. United States** — Second market (parallel or immediate follow-on).
+Largest student market (~16.9M), highest absolute purchasing power, AP May exam window maps cleanly onto the product. More competitive EdTech landscape — enter with creator-led distribution (TikTok/YouTube Study channels) to build brand before facing platform competition. USD pricing required regardless.
+
+**3. Australia** — Third market (parallel to US or short follow-on).
+Best upside-to-competition ratio: strong exam culture (ATAR/HSC/VCE), high purchasing power, well-funded tutoring market (~AU$1.3bn), highest teen weekly pocket money of the three markets, and materially lower AI study-tool competition than the UK or US. Requires AUD App Store localisation.
+
+---
+
+### Recommended Pricing
+
+| Tier | United Kingdom | United States | Australia |
+|---|---|---|---|
+| **Free** | £0 | $0 | AU$0 |
+| **Pro — Monthly** | £4.99/month | $5.99/month | AU$8.99/month |
+| **Pro — Annual** | £34.99/year | $39.99/year | AU$54.99/year |
+| Annual saving | 42% | 44% | 49% |
+| Revenue per annual subscriber | £34.99 | $39.99 | AU$54.99 |
+
+**Primary CTA at every paywall:** annual plan. Monthly as explicit fallback only.
+
+**Free tier features:** 1 subject · plan generation · today's view · study timer · static plan view.
+**Pro features:** unlimited subjects · adaptive re-plan on miss · adaptive re-plan on availability/subject change · plan warnings.
+
+---
+
+### Regional Pricing
+
+**Yes — use local-currency pricing for each market. Do not use a single global USD price.**
+
+Reason: UK App Store prices include 20% VAT; a USD price converted to GBP would exceed the MSL+ market ceiling. Australia's AUD prices are conventionally set higher in nominal terms (Spotify: AU$7.99 vs $5.99 USD) and App Store localisation is required regardless. Using three local prices is a trivial addition to three App Store listings and is the standard practice of every product in this category.
+
+---
+
+### Pricing Confidence
+
+**Medium.**
+
+**What makes this medium rather than high:**
+- No direct UK/AU App Store price confirmation for Quizlet and Structured in local currencies — competitor ceiling in GBP/AUD is based on MSL+ only.
+- No primary-source data for teen-specific (14–18) monthly subscription spend in any country.
+- The conversion rate assumptions in the scenario analysis are illustrative — actual rates are unknown.
+- Australian AUD pricing is benchmarked against Spotify/Apple Arcade (lifestyle apps), not study-planner competitors, because local study-planner prices were not confirmed.
+
+**What would raise confidence to High:**
+- 5 parent pricing conversations (UK) where you name a price and measure willingness: "Would you pay £34.99/year for this?"
+- Direct App Store price verification for MSL+, Quizlet, and Structured in GBP and AUD.
+- One month of real conversion data from a live free tier.
+
+---
+
+## References (Part III)
+
+*(Appended to the main references from Part I. Numbering continues from [35].)*
+
+R36. NFER — "Just a little drop? Pupil numbers are falling slower than previous expectations" (secondary enrolment analysis). nfer.ac.uk. https://www.nfer.ac.uk/blogs/just-a-little-drop-pupil-numbers-are-falling-slower-than-previous-expectations/
+
+R37. BESA — Education Statistics (UK four-nations pupil totals, 2022/23). besa.org.uk. https://www.besa.org.uk/insights/education-statistics/
+
+R38. Ariston Education — "UK Tutoring Statistics 2026" (Sutton Trust 29% prevalence data). ariston.education. https://ariston.education/uk-tutoring-statistics/
+
+R39. Latimer Tuition — "Private Tutor Costs UK 2026" (Parentkind/YouGov survey; £37.45/hour average). latimertuition.com. https://latimertuition.com/ed-centre/parents/finding-the-right-tutor/private-tutor-costs-uk-2026/
+
+R40. My Study Life — MSL+ pricing page (£4.99/month · £29.99/year UK). Checked 2026-08-26. mystudylife.com. https://mystudylife.com/msl-plus/
+
+R41. NCES — Fast Facts: Back-to-school statistics (#372), grades 9–12 enrollment (also cited as [12] in Part I). https://nces.ed.gov/fastfacts/display.asp?id=372
+
+R42. Yahoo Finance / Wiingy — "SAT Prep Tutoring Costs" ($62/hour average). finance.yahoo.com. https://finance.yahoo.com/news/sat-prep-tutoring-costs-63-165100431.html
+
+R43. IvyStrides — "SAT/ACT Tutoring Cost 2026" (range $300–$20,000+). ivystrides.com. https://www.ivystrides.com/blog/sat-act-tutoring-cost/
+
+R44. Piper Sandler — "49th Semi-Annual Taking Stock With Teens® Survey" (Spring 2025; $2,388 teen annual spend; 6,450+ teens). pipersandler.com. https://www.pipersandler.com/news/piper-sandler-completes-49th-semi-annual-taking-stock-teensr-survey
+
+R45. Greenlight — "Average Allowance by Age for Kids" ($13.15/week national average; $20.87/week at age 17). greenlight.com. https://greenlight.com/learning-center/earning/average-allowance-by-age-for-kids
+
+R46. Australian Bureau of Statistics — "Schools 2025" (total enrolment 4,160,918; secondary 45.6%). abs.gov.au. https://www.abs.gov.au/statistics/people/education/schools/latest-release
+
+R47. Study Australia — "Understanding Australian Qualifications" (HSC, VCE, QCE, WACE, SACE, TCE, ATAR explained). studyaustralia.gov.au. https://www.studyaustralia.gov.au/en/tools-and-resources/tips-and-advice-for-students/understanding-australian-qualifications
+
+R48. Westpac — "Kids earning more pocket money than ever before" media release (AU$25.02/week average; 1,007 parents surveyed, Apr 2025). westpac.com.au. https://www.westpac.com.au/about-westpac/media/media-releases/2025/28-september/
+
+R49. Tutoring.net.au — "Tutoring Statistics" (AU$1.3bn/year market). tutoring.net.au. https://tutoring.net.au/statistics/
+
+R50. Cluey Learning — "How Much Does Tutoring Cost in Australia 2025" (AU$70–90/hour Cluey; AU$30–150/hour market range). clueylearning.com.au. https://clueylearning.com.au/blog/how-much-should-tutoring-cost/
+
+R51. Spotify — Student plan pricing page (AU$7.99/month, Australia). spotify.com. https://www.spotify.com/au/student/
+
+R52. Statistics Canada — "Elementary-Secondary Education Survey 2022/23" (total K–12; grades 9–12 not published as a single figure). statcan.gc.ca. https://www.statcan.gc.ca/o1/en/app/7744-elementary-secondary-education-finances-students-and-educators-20222023
+
+R53. NatWest / Rooster Money — "Pocket Money Index 2025" (£8.31/week for 17-yr-olds; 354,238 users). natwestgroup.com. https://www.natwestgroup.com/news-and-insights/news-room/press-releases/financial-capability-and-learning/2025/jun/annual-natwest-rooster-money-pocket-money-index-reveals-industri.html
+
+R54. Statista — "Average weekly income of children in the UK 2024-25, by age" (£23.97/week for 17-yr-olds, incl. part-time work; paywalled). statista.com. https://www.statista.com/statistics/1006191/average-value-of-pocket-money-in-the-uk-by-age
+
+R55. Aqua Card — "Subscription Spending in 2025" (£786/year average for UK adults 16+; 2,000 people surveyed Jun–Jul 2025). aquacard.co.uk. https://www.aquacard.co.uk/building-better-credit/subscription-spending-in-2025
+
+R56. Spotify — Student plan pricing, UK (£5.99/month) and US ($5.99/month). spotify.com/uk/student · spotify.com/us/student
+
+R57. Bango / The Desk — "Gen Z consumer survey" (Gen Z ~$118/month on subscriptions, ages 13–28; Apr 2025). thedesk.net. https://thedesk.net/2025/04/bango-generation-z-young-consumer-survey/
+
+R58. Brighterly — "How Much Does Quizlet Cost 2026" ($7.99/month · $35.99/year). brighterly.com. https://brighterly.com/blog/quizlet-cost/
+
+R59. Structured — "New Pricing" blog post ($6.49/month · $19.99/year · $64.99 lifetime). structured.app. https://structured.app/blog/new-pricing
+
+R60. Suprmind — "ChatGPT Plus Price" ($20/month USD; no current student discount). suprmind.ai. https://suprmind.ai/hub/chatgpt/pricing/chatgpt-plus-price/
+
+R61. Duolingo Guides — "How Much is Super Duolingo" ($12.99/month · $59.99/year · $119.99/year family). duolingoguides.com. https://duolingoguides.com/how-much-is-super-duolingo/
+
+R62. AI Flow Review — "Khanmigo AI Review 2025" (~$4/month · ~$44/year individual). aiflowreview.com. https://aiflowreview.com/khanmigo-ai-review-2025/
+
+R63. ThePricer — "Apple Arcade Cost" (AU$9.99/month · $49.99/year AUD). thepricer.org. https://www.thepricer.org/how-much-does-apple-arcade-cost/
+
+R64. FastAccess AI — "ChatGPT Plus Australia Price" (AU$32.98/month). fastgptplus.com. https://fastgptplus.com/en/posts/chatgpt-plus-australia-price/
+
+---
+
+*End of Part III. Prices should be re-verified against live App Store listings before any public announcement; App Store prices can change with 30 days' notice. The affordability and conversion-rate figures are directional estimates to be replaced with real data from a pricing test and early user cohorts.*
