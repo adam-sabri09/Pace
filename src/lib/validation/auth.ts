@@ -25,9 +25,25 @@ export const SignUpSchema = z.object({
     error: "You must confirm you are 13 or older to use Pace.",
   }),
   // IANA timezone auto-detected on the client via Intl.DateTimeFormat().
-  // We accept anything non-empty here and treat missing/unknown as
-  // "UTC" further down the stack.
-  timeZone: z.string().trim().min(1).max(100).catch("UTC"),
+  // The refine rejects non-IANA strings (e.g. "not-a-tz") before they reach
+  // the DB; .catch("UTC") keeps the fallback for missing or unrecognised values.
+  timeZone: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .refine(
+      (tz) => {
+        try {
+          Intl.DateTimeFormat(undefined, { timeZone: tz });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Invalid timezone." },
+    )
+    .catch("UTC"),
 });
 export type SignUpInput = z.infer<typeof SignUpSchema>;
 
