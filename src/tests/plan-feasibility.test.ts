@@ -87,6 +87,56 @@ describe("checkPlanFeasibility", () => {
   });
 });
 
+describe("checkPlanFeasibility check 3 — short scheduling window", () => {
+  it("rejects when exam is tomorrow and today's only window has already closed", () => {
+    // Tuesday 18:30 UTC; Tue window closes at 18:00 — too late for a 45-min session.
+    // Exam is Wednesday; no Wednesday availability. Zero schedulable slots.
+    const r = checkPlanFeasibility(
+      base({
+        timeZone: "UTC",
+        now: new Date("2026-08-25T18:30:00Z"),
+        subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-26", topics: [] }],
+        availability: [{ dayOfWeek: 2, startsAt: "16:00", endsAt: "18:00" }],
+      }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/no study slots/i);
+  });
+
+  it("accepts when exam is tomorrow and tomorrow has its own availability", () => {
+    // Tuesday 18:30 UTC — today's window passed. Exam is Wednesday.
+    // Wednesday has a morning slot: still feasible.
+    expect(
+      checkPlanFeasibility(
+        base({
+          timeZone: "UTC",
+          now: new Date("2026-08-25T18:30:00Z"),
+          subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-26", topics: [] }],
+          availability: [
+            { dayOfWeek: 2, startsAt: "16:00", endsAt: "18:00" }, // Tuesday (passed)
+            { dayOfWeek: 3, startsAt: "09:00", endsAt: "11:00" }, // Wednesday (free)
+          ],
+        }),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it("accepts when today still has remaining time before the window closes", () => {
+    // Tuesday 14:30 UTC; window is 16:00–18:00 — session can start at 16:00 (future).
+    // Exam is Wednesday. Feasible.
+    expect(
+      checkPlanFeasibility(
+        base({
+          timeZone: "UTC",
+          now: new Date("2026-08-25T14:30:00Z"),
+          subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-26", topics: [] }],
+          availability: [{ dayOfWeek: 2, startsAt: "16:00", endsAt: "18:00" }],
+        }),
+      ).ok,
+    ).toBe(true);
+  });
+});
+
 describe("PlanOutputSchema now permits an empty plan", () => {
   it("accepts sessions: [] (handled downstream, not a schema crash)", () => {
     const parsed = PlanOutputSchema.safeParse({ sessions: [], warnings: [] });

@@ -197,9 +197,10 @@ export function checkPlanFeasibility(
   // 1. At least one exam/target date must be strictly in the future (the
   //    user's local "today"). An exam today or in the past leaves no room to
   //    schedule study before it.
-  const todayLocal = utcToLocalParts(input.now, input.timeZone).dateString;
+  const todayLocal = utcToLocalParts(input.now, input.timeZone);
+  const todayDateStr = todayLocal.dateString;
   const latestExam = latestExamDateOf(input);
-  if (!latestExam || latestExam <= todayLocal) {
+  if (!latestExam || latestExam <= todayDateStr) {
     return {
       ok: false,
       error:
@@ -218,6 +219,54 @@ export function checkPlanFeasibility(
     return {
       ok: false,
       error: `Your available time blocks are shorter than your ${input.sessionLengthMinutes}-minute sessions. Add a longer window or choose a shorter session length.`,
+    };
+  }
+
+  // 3. At least one availability window occurrence must actually fall between
+  //    now and the latest exam date, with enough room remaining for a full
+  //    session. Checks 1–2 verify that a long-enough window exists globally,
+  //    but miss the case where the exam is soon and that window's day-of-week
+  //    never appears before the exam (e.g. exam tomorrow, available only on
+  //    Wednesdays, and today is Tuesday evening with the window already closed).
+  const todayMinutes = todayLocal.minutesInDay;
+  const windowsByDOW = new Map<number, Array<{ startsAt: number; endsAt: number }>>();
+  for (const w of input.availability) {
+    const list = windowsByDOW.get(w.dayOfWeek) ?? [];
+    list.push({ startsAt: hhmmToMinutes(w.startsAt), endsAt: hhmmToMinutes(w.endsAt) });
+    windowsByDOW.set(w.dayOfWeek, list);
+  }
+
+  // Using noon UTC as anchor so the date stays correct in any timezone.
+  const todayDate = new Date(todayDateStr + "T12:00:00Z");
+  const examDate = new Date(latestExam + "T12:00:00Z");
+  const daysToExam = Math.round((examDate.getTime() - todayDate.getTime()) / 86_400_000);
+
+  // 7+ days guarantees every day-of-week appears at least once; check 2 already
+  // confirmed a sufficient-length window exists, so feasibility is certain.
+  if (daysToExam >= 7) return { ok: true };
+
+  // Short range: walk day-by-day and confirm at least one session can fit.
+  let hasFeasibleSlot = false;
+  for (let d = 0; d <= daysToExam && !hasFeasibleSlot; d++) {
+    const dayDate = new Date(todayDate.getTime() + d * 86_400_000);
+    const { dayOfWeek } = utcToLocalParts(dayDate, input.timeZone);
+    const windows = windowsByDOW.get(dayOfWeek);
+    if (!windows) continue;
+    hasFeasibleSlot = windows.some((w) => {
+      if (d === 0) {
+        // Today: session must start at or after the current local time.
+        return w.endsAt - input.sessionLengthMinutes >= todayMinutes;
+      }
+      // Future day: window must be long enough for a full session.
+      return w.endsAt - w.startsAt >= input.sessionLengthMinutes;
+    });
+  }
+
+  if (!hasFeasibleSlot) {
+    return {
+      ok: false,
+      error:
+        "No study slots fit between now and your exam. Add availability on the days leading up to it, or move your exam date out.",
     };
   }
 
