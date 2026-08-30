@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { updateSubjectIntelligenceAction } from "@/server/actions/subject-intelligence";
 import type { Difficulty } from "@/lib/personalization/types";
@@ -22,6 +23,7 @@ export function SubjectIntelligenceForm({
   initialDifficulty,
   initialConfidencePct,
 }: Props) {
+  const router = useRouter();
   const [difficulty, setDifficulty] = useState<Difficulty | null>(initialDifficulty);
   const [confidencePct, setConfidencePct] = useState<number | null>(initialConfidencePct);
   const [saved, setSaved] = useState(false);
@@ -35,6 +37,11 @@ export function SubjectIntelligenceForm({
       const result = await updateSubjectIntelligenceAction(subjectId, difficulty, confidencePct);
       if (result.ok) {
         setSaved(true);
+        // Flush the client Router Cache so navigating to /today picks up the
+        // updated difficulty/confidence rather than a stale cached render.
+        // revalidatePath("/today") in the server action handles the server-side
+        // Full Route Cache; router.refresh() handles the client-side Router Cache.
+        router.refresh();
         setTimeout(() => setSaved(false), 2000);
       } else {
         setError(result.error);

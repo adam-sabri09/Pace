@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { addSubjectAction } from "@/server/actions/subjects";
 import type { Difficulty } from "@/lib/personalization/types";
@@ -12,6 +13,7 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string }[] = [
 ];
 
 export function AddSubjectForm() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [examDate, setExamDate] = useState("");
@@ -64,6 +66,7 @@ export function AddSubjectForm() {
         confidencePct,
       });
       if (result.ok) {
+        router.refresh();
         reset();
         setOpen(false);
       } else {
