@@ -1,12 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { SubjectIntelligenceForm } from "./subject-intelligence-form";
+import type { Difficulty } from "@/lib/personalization/types";
 
-/**
- * /subjects — read-only view of the user's subjects, topics, and exam dates
- * (Choice 1-A). Editing lands with adaptive re-planning in Step 7 so we
- * don't ship a Save button that quietly leaves the plan out of sync.
- */
 export default async function SubjectsPage() {
   const supabase = await createClient();
   const {
@@ -23,7 +20,7 @@ export default async function SubjectsPage() {
 
   const { data: subjects } = await supabase
     .from("subjects")
-    .select("id, name, exam_date, topics(id, name)")
+    .select("id, name, exam_date, difficulty, confidence_pct, topics(id, name)")
     .eq("user_id", user.id)
     .order("created_at", { ascending: true });
 
@@ -34,7 +31,7 @@ export default async function SubjectsPage() {
           Subjects
         </h1>
         <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-          Editing subjects, topics, and dates ships with adaptive re-planning.
+          Your subjects, topics, and exam dates. Rate each subject&rsquo;s difficulty and your confidence to sharpen your daily recommendations.
         </p>
       </header>
 
@@ -79,6 +76,11 @@ export default async function SubjectsPage() {
                     No topics.
                   </p>
                 )}
+                <SubjectIntelligenceForm
+                  subjectId={s.id as string}
+                  initialDifficulty={(s.difficulty as Difficulty | null) ?? null}
+                  initialConfidencePct={(s.confidence_pct as number | null) ?? null}
+                />
               </section>
             );
           })}

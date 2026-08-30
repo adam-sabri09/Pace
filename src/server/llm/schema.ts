@@ -75,4 +75,13 @@ export type PlanInput = {
     startsAt: string; // ISO
     durationMinutes: number;
   }>;
+  profile?: {
+    ageGroup: "younger" | "older" | "adult";
+    topTechnique: string; // TechniqueKey
+    subjectIntelligence?: Array<{
+      subjectName: string;
+      difficulty?: "easy" | "medium" | "hard";
+      confidencePct?: number; // 0-100
+    }>;
+  };
 };

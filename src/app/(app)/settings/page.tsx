@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { logOutAction } from "@/server/actions/auth";
 
 /**
@@ -23,10 +25,25 @@ export default function SettingsPage() {
           </span>
           Preferences
         </h2>
-        <p className="font-body-md text-body-md text-on-surface-variant">
-          Availability, session length, and other preferences arrive with
-          adaptive re-planning.
-        </p>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface">Study style</p>
+              <p className="font-body-md text-body-md text-on-surface-variant">
+                Your answers shape which technique Pace recommends each day.
+              </p>
+            </div>
+            <Link
+              href="/personalize"
+              className="shrink-0 font-label-md text-label-md text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/5 transition-colors"
+            >
+              Update
+            </Link>
+          </div>
+          <p className="font-body-md text-body-md text-on-surface-variant border-t border-outline-variant pt-3">
+            Availability, session length, and other preferences arrive with adaptive re-planning.
+          </p>
+        </div>
       </section>
 
       <section className="border border-outline-variant rounded-xl p-stack-md bg-surface-container-lowest">

@@ -82,6 +82,35 @@ Signatures below are the source of truth. Types live in `src/server/actions/*` a
 - **Effect**: Deletes the user's `auth.users` row; cascading deletes remove all owned data.
 - **Requires session**: yes.
 
+### `personalization.save(_prev, answers)`
+- **Input**: `PersonalizationAnswers` (all 6 fields: ageGroup, focusBand, studyHabit, studyChallenge, studyGoal, memoryRating). Zod-validated.
+- **Effect**: Saves answers and age_group to `profiles`, sets `personalization_completed_at = now()`, clears `personalization_skipped`. Redirects to `/today` on success.
+- **Output**: `{ ok: false; error: string } | null` (null on redirect).
+- **Requires session**: yes.
+
+### `personalization.skip()`
+- **Input**: none.
+- **Effect**: Sets `profiles.personalization_skipped = true`. No redirect (caller handles UI state).
+- **Requires session**: yes (silently no-ops if not authenticated).
+
+### `subjects.updateIntelligence(subjectId, difficulty, confidencePct)`
+- **Input**: `{ subjectId: UUID; difficulty: "easy"|"medium"|"hard"|null; confidencePct: 0..100|null }`.
+- **Effect**: Updates `subjects.difficulty` and `subjects.confidence_pct` for the given subject (scoped to `user_id`). Does not trigger re-planning.
+- **Output**: `{ ok: true } | { ok: false; error }`.
+- **Requires session**: yes.
+
+### `ocr.extractSchedule(formData)`
+- **Input**: `FormData` with key `schedule` (File, max 5 MB, JPEG/PNG/WebP/GIF/PDF).
+- **Effect**: Sends image to Gemini 2.0 Flash with vision prompt. Extracts subjects, exam dates, and topics. Does **not** save anything.
+- **Output**: `{ ok: true; extracted: { subjects: [{ name, examDate, topics }] } } | { ok: false; error }`.
+- **Requires session**: yes.
+
+### `ocr.saveSubjects(subjects)`
+- **Input**: Array of confirmed subjects `[{ name, examDate, topics[], difficulty, confidencePct }]`, Zod-validated.
+- **Effect**: Deletes all existing subjects (topics cascade), inserts new subjects + topics, triggers `rePlanForUser`.
+- **Output**: `{ ok: true } | { ok: false; error }`.
+- **Requires session**: yes. Requires onboarding to be complete.
+
 ## LLM I/O contract
 
 Both directions are Zod-validated. LLM never sees the raw user session — only the prompt.

@@ -191,6 +191,30 @@ All 15 conflicts flagged in [DESIGN-SPEC.md](../design/design-spec.md) §7 were 
 - **Status**: Accepted
 - They are rendered as full-screen overlays with the nav shell suppressed, but URL remains `/today` (or `/study/[sessionId]` in the case of Session Complete reached from the timer).
 
+## D36. Personalization questionnaire is optional and skippable (personalization module).
+- **Status**: Accepted
+- **Decision**: The 6-question questionnaire at `/personalize` can be skipped from the `/today` CTA banner or from within the form. `profiles.personalization_skipped` stores the skip; `personalization_completed_at IS NULL AND NOT personalization_skipped` gates the CTA.
+- **Reasoning**: Mandatory onboarding increases abandonment. The planner must work without personalization answers.
+- **Trade-off**: Some users may never complete it; personalization-driven recommendations will be absent for them.
+
+## D37. Personalization scoring is deterministic, not LLM-driven.
+- **Status**: Accepted
+- **Decision**: A rule-based weight matrix (6 answers × 7 technique weights) produces a normalised score for each of the 7 study techniques. The top-scoring technique becomes the recommendation. No LLM call.
+- **Reasoning**: Deterministic → predictable, testable, free. The mapping from study-habit answers to technique recommendations is domain knowledge, not a generative task.
+- **Trade-off**: Cannot capture nuance that a model might surface. Acceptable for an MVP.
+
+## D38. OCR uses Gemini vision (gemini-2.0-flash) with mandatory user confirmation.
+- **Status**: Accepted
+- **Decision**: `/upload-schedule` sends the image to Gemini via AI SDK v7 messages format, extracts subjects/exam-dates/topics, then shows the results in editable cards. Nothing is saved until the user clicks "Save and replan".
+- **Reasoning**: OCR is fallible. Auto-saving unconfirmed data would silently corrupt the plan if the model misreads a name or date. The confirmation step is mandatory.
+- **Trade-off**: One extra user step. Worth it for correctness.
+
+## D39. Subject difficulty and confidence are optional, stored per-subject.
+- **Status**: Accepted
+- **Decision**: `subjects.difficulty` (easy/medium/hard nullable) and `subjects.confidence_pct` (0–100 int nullable) are stored per-subject. They feed the recommender but do not affect plan generation scheduling (only technique recommendations, not session counts).
+- **Reasoning**: Keeps plan generation simple; personalization is additive, not structural.
+- **Trade-off**: A high-confidence hard subject might not get enough sessions — the LLM only sees exam date and topic count. Acceptable for MVP.
+
 ---
 
 ## Deferred (recorded, not decided)

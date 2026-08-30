@@ -14,6 +14,8 @@ import {
   type PlanChange,
   type PlanWarning,
 } from "@/server/llm/diff";
+import { scorePersonalization } from "@/lib/personalization/scoring";
+import type { PersonalizationAnswers } from "@/lib/personalization/types";
 
 /**
  * Plan generation + adaptive re-planning.
@@ -84,10 +86,14 @@ async function buildPlanInput(
   includeCompleted: boolean,
 ): Promise<{ ok: true; input: PlanInput; timeZone: string } | { ok: false; error: string }> {
   const [profileRes, subjectsRes, availRes] = await Promise.all([
-    supabase.from("profiles").select("time_zone").eq("id", userId).maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("time_zone, age_group, personalization_answers, personalization_completed_at")
+      .eq("id", userId)
+      .maybeSingle(),
     supabase
       .from("subjects")
-      .select("id, name, exam_date, topics(id, name)")
+      .select("id, name, exam_date, difficulty, confidence_pct, topics(id, name)")
       .eq("user_id", userId),
     supabase
       .from("availability_windows")
@@ -124,6 +130,32 @@ async function buildPlanInput(
     });
   }
 
+  // Build optional personalization profile block.
+  const profileData = profileRes.data;
+  let planProfile: PlanInput["profile"] = undefined;
+  if (
+    profileData?.personalization_completed_at &&
+    profileData?.personalization_answers
+  ) {
+    try {
+      const answers = profileData.personalization_answers as PersonalizationAnswers;
+      const scoring = scorePersonalization(answers);
+      planProfile = {
+        ageGroup: profileData.age_group as "younger" | "older" | "adult",
+        topTechnique: scoring.topTechnique,
+        subjectIntelligence: subjectsRes.data
+          .filter((s) => s.difficulty || s.confidence_pct != null)
+          .map((s) => ({
+            subjectName: s.name as string,
+            difficulty: (s.difficulty as "easy" | "medium" | "hard" | null) ?? undefined,
+            confidencePct: (s.confidence_pct as number | null) ?? undefined,
+          })),
+      };
+    } catch {
+      // Scoring failure is non-fatal — proceed without personalization context.
+    }
+  }
+
   const input: PlanInput = {
     timeZone,
     now: new Date(),
@@ -142,6 +174,7 @@ async function buildPlanInput(
       endsAt: (w.ends_at as string).slice(0, 5),
     })),
     completedSessions,
+    profile: planProfile,
   };
 
   if (input.subjects.length === 0) {
