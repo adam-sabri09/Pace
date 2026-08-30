@@ -3,6 +3,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -40,5 +41,8 @@ export async function updateSubjectIntelligenceAction(
     .eq("user_id", user.id);
 
   if (error) return { ok: false, error: "Could not update subject. Try again." };
+
+  revalidatePath("/today");
+  revalidatePath("/subjects");
   return { ok: true };
 }

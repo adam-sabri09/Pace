@@ -56,3 +56,5 @@ supabase/.temp/
 stitch_pace_adaptive_study_planner*
 *.zip
 desktop.ini
+.vercel
+.env*

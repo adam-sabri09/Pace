@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { SubjectIntelligenceForm } from "./subject-intelligence-form";
+import { AddSubjectForm } from "./add-subject-form";
 import type { Difficulty } from "@/lib/personalization/types";
 
 export default async function SubjectsPage() {
@@ -27,13 +28,19 @@ export default async function SubjectsPage() {
   return (
     <main className="w-full max-w-3xl mx-auto px-container-margin py-stack-lg flex flex-col gap-stack-md">
       <header className="border-b border-outline-variant pb-stack-sm">
-        <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-          Subjects
-        </h1>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-          Your subjects, topics, and exam dates. Rate each subject&rsquo;s difficulty and your confidence to sharpen your daily recommendations.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
+              Subjects
+            </h1>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1">
+              Your subjects, topics, and exam dates. Rate each subject&rsquo;s difficulty and your confidence to sharpen your daily recommendations.
+            </p>
+          </div>
+        </div>
       </header>
+
+      <AddSubjectForm />
 
       {subjects && subjects.length > 0 ? (
         <div className="flex flex-col gap-stack-md">

@@ -176,3 +176,102 @@ describe('buildTodayRecommendation', () => {
     expect(rec!.rationale).toMatch(/confidence|practice/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: difficulty + confidence changes must change the top recommendation
+//
+// Reproduces the bug where updating a subject's difficulty/confidence on the
+// Subjects page had no visible effect on the Today recommendation.
+// The recommender logic was always correct; this confirms it stays correct as
+// a guard against future regressions.
+// ---------------------------------------------------------------------------
+
+describe('rankSubjects — difficulty/confidence regression', () => {
+  const MATH_ID = 'math-id';
+  const PHYSICS_ID = 'physics-id';
+  const ENGLISH_ID = 'english-id';
+
+  // Baseline: Math Hard/20%, Physics Easy/90%, English Medium/50% — no exam dates.
+  // Expected priorities:
+  //   Math:    hard(3) × urgency(1) × confInv(20%→5) = 15  ← top
+  //   English: medium(2) × urgency(1) × confInv(50%→3) = 6
+  //   Physics: easy(1)  × urgency(1) × confInv(90%→1) = 1
+  it('Math Hard/20% ranks first when all subjects have no exam date', () => {
+    const subjects: SubjectIntelligence[] = [
+      { subjectId: MATH_ID,    subjectName: 'Math',    difficulty: 'hard',   confidencePct: 20, examDate: null },
+      { subjectId: PHYSICS_ID, subjectName: 'Physics', difficulty: 'easy',   confidencePct: 90, examDate: null },
+      { subjectId: ENGLISH_ID, subjectName: 'English', difficulty: 'medium', confidencePct: 50, examDate: null },
+    ];
+    const ranked = rankSubjects(subjects, TODAY);
+    expect(ranked[0].subject.subjectId).toBe(MATH_ID);
+    expect(ranked[0].priority).toBe(15);
+  });
+
+  it('Math Easy/90% ranks last after values change (priority drops to 1)', () => {
+    const subjects: SubjectIntelligence[] = [
+      { subjectId: MATH_ID,    subjectName: 'Math',    difficulty: 'easy',   confidencePct: 90, examDate: null },
+      { subjectId: PHYSICS_ID, subjectName: 'Physics', difficulty: 'easy',   confidencePct: 90, examDate: null },
+      { subjectId: ENGLISH_ID, subjectName: 'English', difficulty: 'medium', confidencePct: 50, examDate: null },
+    ];
+    const ranked = rankSubjects(subjects, TODAY);
+    // Math: easy(1) × urgency(1) × confInv(90%→1) = 1
+    // English should now be top: medium(2) × urgency(1) × confInv(50%→3) = 6
+    expect(ranked[0].subject.subjectId).toBe(ENGLISH_ID);
+    expect(ranked[0].priority).toBe(6);
+    // Math must not be recommended first
+    expect(ranked[0].subject.subjectId).not.toBe(MATH_ID);
+    // Math's priority is 1 — lowest possible
+    const mathEntry = ranked.find(r => r.subject.subjectId === MATH_ID);
+    expect(mathEntry!.priority).toBe(1);
+  });
+
+  it('buildTodayRecommendation picks Math when it is Hard/20%', () => {
+    const subjects: SubjectIntelligence[] = [
+      { subjectId: MATH_ID,    subjectName: 'Math',    difficulty: 'hard',   confidencePct: 20, examDate: null },
+      { subjectId: PHYSICS_ID, subjectName: 'Physics', difficulty: 'easy',   confidencePct: 90, examDate: null },
+      { subjectId: ENGLISH_ID, subjectName: 'English', difficulty: 'medium', confidencePct: 50, examDate: null },
+    ];
+    const rec = buildTodayRecommendation(subjects, 'active_recall', 45, TODAY);
+    expect(rec!.subjectId).toBe(MATH_ID);
+    expect(rec!.subjectName).toBe('Math');
+  });
+
+  it('buildTodayRecommendation no longer picks Math after it becomes Easy/90%', () => {
+    const subjects: SubjectIntelligence[] = [
+      { subjectId: MATH_ID,    subjectName: 'Math',    difficulty: 'easy',   confidencePct: 90, examDate: null },
+      { subjectId: PHYSICS_ID, subjectName: 'Physics', difficulty: 'easy',   confidencePct: 90, examDate: null },
+      { subjectId: ENGLISH_ID, subjectName: 'English', difficulty: 'medium', confidencePct: 50, examDate: null },
+    ];
+    const rec = buildTodayRecommendation(subjects, 'active_recall', 45, TODAY);
+    expect(rec!.subjectId).not.toBe(MATH_ID);
+    expect(rec!.subjectId).toBe(ENGLISH_ID);
+  });
+
+  it('an upcoming exam can make a low-priority subject the top recommendation', () => {
+    // Physics is easy/90% — normally lowest priority.
+    // But with a 5-day exam it gets urgency 10.
+    // Physics: easy(1) × urgency10 × confInv(90%→1) = 10
+    // Math Easy/90%: easy(1) × urgency(1) × confInv(90%→1) = 1
+    // English: medium(2) × urgency(1) × confInv(50%→3) = 6
+    // Physics wins.
+    const subjects: SubjectIntelligence[] = [
+      { subjectId: MATH_ID,    subjectName: 'Math',    difficulty: 'easy',   confidencePct: 90, examDate: null },
+      { subjectId: PHYSICS_ID, subjectName: 'Physics', difficulty: 'easy',   confidencePct: 90, examDate: '2026-09-06' }, // 5 days from TODAY
+      { subjectId: ENGLISH_ID, subjectName: 'English', difficulty: 'medium', confidencePct: 50, examDate: null },
+    ];
+    const ranked = rankSubjects(subjects, TODAY);
+    expect(ranked[0].subject.subjectId).toBe(PHYSICS_ID);
+    expect(ranked[0].priority).toBe(10);
+  });
+
+  it('priority formula is stable: same inputs always produce the same ranking', () => {
+    const subjects: SubjectIntelligence[] = [
+      { subjectId: MATH_ID,    subjectName: 'Math',    difficulty: 'hard',   confidencePct: 20, examDate: null },
+      { subjectId: PHYSICS_ID, subjectName: 'Physics', difficulty: 'easy',   confidencePct: 90, examDate: null },
+      { subjectId: ENGLISH_ID, subjectName: 'English', difficulty: 'medium', confidencePct: 50, examDate: null },
+    ];
+    const first  = rankSubjects(subjects, TODAY).map(r => r.subject.subjectId);
+    const second = rankSubjects(subjects, TODAY).map(r => r.subject.subjectId);
+    expect(first).toEqual(second);
+  });
+});
