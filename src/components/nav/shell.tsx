@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
  */
 
 type Item = {
-  href: "/today" | "/plan" | "/subjects" | "/settings";
+  href: "/today" | "/plan" | "/subjects" | "/upload-schedule" | "/settings";
   label: string;
   icon: string;
 };
@@ -20,6 +20,7 @@ const ITEMS: Item[] = [
   { href: "/today", label: "Today", icon: "calendar_today" },
   { href: "/plan", label: "Plan", icon: "event_note" },
   { href: "/subjects", label: "Subjects", icon: "menu_book" },
+  { href: "/upload-schedule", label: "Upload", icon: "upload" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];
 

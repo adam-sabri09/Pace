@@ -50,6 +50,40 @@ export function buildPrompt(input: PlanInput): string {
           .join("\n")
       : "";
 
+  const AGE_LABELS: Record<string, string> = {
+    younger: "GCSE / Year 9-11 (14-15 year old)",
+    older: "A-Level / Year 12-13 (16-17 year old)",
+    adult: "University / 18+",
+  };
+  const profileBlock = input.profile
+    ? (() => {
+        const { ageGroup, topTechnique, subjectIntelligence } = input.profile;
+        const subjectNotes =
+          subjectIntelligence && subjectIntelligence.length > 0
+            ? subjectIntelligence
+                .filter((s) => s.difficulty || s.confidencePct != null)
+                .map((s) => {
+                  const parts: string[] = [];
+                  if (s.difficulty) parts.push(s.difficulty);
+                  if (s.confidencePct != null)
+                    parts.push(`${s.confidencePct}% confident`);
+                  return `    * ${s.subjectName}: ${parts.join(", ")}`;
+                })
+                .join("\n")
+            : "";
+        return (
+          "\nStudent profile (use to personalise session instructions):\n" +
+          `  - Age group: ${AGE_LABELS[ageGroup] ?? ageGroup}\n` +
+          `  - Preferred study technique: ${topTechnique.replace(/_/g, " ")}\n` +
+          (subjectNotes
+            ? `  - Subject difficulty/confidence:\n${subjectNotes}\n`
+            : "") +
+          `  When writing the "instruction" field, prefer wording that matches the preferred technique.\n` +
+          `  For harder subjects with lower confidence, bias toward more frequent topic coverage.\n`
+        );
+      })()
+    : "";
+
   return `You are Pace, an adaptive study planner for high-school students.
 Build a realistic, day-by-day study schedule.
 
@@ -63,7 +97,7 @@ ${subjectBlock}
 Weekly availability windows (student's local time):
 ${availabilityBlock}
 ${completedBlock}
-
+${profileBlock}
 Rules:
 1. Every session's startsAt is a local wall-clock string in the student's
    timezone, formatted YYYY-MM-DDTHH:MM (no offset, no seconds).

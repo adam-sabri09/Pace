@@ -3,26 +3,27 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SessionCard, type SessionStatus } from "@/components/session-card";
 import { localWallClockToUTC, utcToLocalParts } from "@/server/llm/time";
+import { PersonalizationCta } from "@/components/personalization-cta";
+import { buildTodayRecommendation } from "@/lib/personalization/recommender";
+import { scorePersonalization } from "@/lib/personalization/scoring";
+import { getRecommendationPresentation } from "@/lib/personalization/recommendation-presentation";
+import type { PersonalizationAnswers, SubjectIntelligence, TechniqueKey } from "@/lib/personalization/types";
 
 /**
  * /today — dashboard for the current local day.
- *
- * Auth is enforced by the (app) layout. This page adds:
- *   - onboarding gate (redirect to /onboarding if session_length_minutes is null)
- *   - fetch sessions inside the user's local day
- *   - render SessionCards
  */
 export default async function TodayPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  // Layout already guaranteed a user, but TypeScript needs the guard.
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("first_name, session_length_minutes, time_zone")
+    .select(
+      "first_name, session_length_minutes, time_zone, personalization_completed_at, personalization_skipped, personalization_answers, age_group",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -42,16 +43,31 @@ export default async function TodayPage() {
     timeZone,
   ).toISOString();
 
-  // Exam widget: nearest future exam date across subjects.
-  const { data: subjects } = await supabase
-    .from("subjects")
-    .select("name, exam_date")
-    .eq("user_id", user.id)
-    .not("exam_date", "is", null)
-    .gte("exam_date", localNow.dateString)
-    .order("exam_date", { ascending: true })
-    .limit(1);
-  const nextExam = subjects?.[0] ?? null;
+  const [examRes, sessionsRes, subjectsRes] = await Promise.all([
+    supabase
+      .from("subjects")
+      .select("name, exam_date")
+      .eq("user_id", user.id)
+      .not("exam_date", "is", null)
+      .gte("exam_date", localNow.dateString)
+      .order("exam_date", { ascending: true })
+      .limit(1),
+    supabase
+      .from("sessions")
+      .select(
+        "id, starts_at, duration_minutes, instruction, status, topic:topics(name, subject:subjects(name))",
+      )
+      .eq("user_id", user.id)
+      .gte("starts_at", dayStartUTC)
+      .lte("starts_at", dayEndUTC)
+      .order("starts_at", { ascending: true }),
+    supabase
+      .from("subjects")
+      .select("id, name, exam_date, difficulty, confidence_pct")
+      .eq("user_id", user.id),
+  ]);
+
+  const nextExam = examRes.data?.[0] ?? null;
   const daysToExam = nextExam
     ? Math.max(
         1,
@@ -63,17 +79,7 @@ export default async function TodayPage() {
       )
     : null;
 
-  const { data: sessions } = await supabase
-    .from("sessions")
-    .select(
-      "id, starts_at, duration_minutes, instruction, status, topic:topics(name, subject:subjects(name))",
-    )
-    .eq("user_id", user.id)
-    .gte("starts_at", dayStartUTC)
-    .lte("starts_at", dayEndUTC)
-    .order("starts_at", { ascending: true });
-
-  const cards = (sessions ?? []).map((s) => {
+  const cards = (sessionsRes.data ?? []).map((s) => {
     const topic = Array.isArray(s.topic) ? s.topic[0] : s.topic;
     const subject = topic
       ? Array.isArray(topic.subject)
@@ -106,6 +112,38 @@ export default async function TodayPage() {
     timeZone,
   }).format(now);
 
+  // -------------------------------------------------------------------------
+  // Personalization
+  // -------------------------------------------------------------------------
+  const isPersonalized = !!profile?.personalization_completed_at;
+  const isSkipped = !!profile?.personalization_skipped;
+  const showCta = !isPersonalized && !isSkipped;
+
+  let recommendation = null;
+  let recommendationPresentation = getRecommendationPresentation("low");
+  if (isPersonalized && profile?.personalization_answers) {
+    try {
+      const answers = profile.personalization_answers as PersonalizationAnswers;
+      const scoring = scorePersonalization(answers);
+      recommendationPresentation = getRecommendationPresentation(scoring.confidenceLevel);
+      const subjectIntelligence: SubjectIntelligence[] = (subjectsRes.data ?? []).map((s) => ({
+        subjectId: s.id as string,
+        subjectName: s.name as string,
+        difficulty: (s.difficulty as "easy" | "medium" | "hard" | null) ?? null,
+        confidencePct: (s.confidence_pct as number | null) ?? null,
+        examDate: (s.exam_date as string | null) ?? null,
+      }));
+      recommendation = buildTodayRecommendation(
+        subjectIntelligence,
+        scoring.topTechnique as TechniqueKey,
+        profile.session_length_minutes as number,
+        localNow.dateString,
+      );
+    } catch {
+      // Non-fatal — recommendation is optional
+    }
+  }
+
   return (
     <main className="w-full max-w-3xl mx-auto px-container-margin py-stack-lg flex flex-col gap-stack-md">
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 border-b border-outline-variant pb-stack-sm">
@@ -137,6 +175,35 @@ export default async function TodayPage() {
           </div>
         )}
       </header>
+
+      {showCta && <PersonalizationCta />}
+
+      {recommendation && (
+        <section className="border border-outline-variant rounded-xl p-4 bg-surface-container-lowest">
+          <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2">
+            {recommendationPresentation.eyebrow}
+          </p>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <p className="font-headline-md text-headline-md text-on-surface">
+              {recommendation.subjectName} — {recommendation.techniqueLabel}
+            </p>
+            <span className="font-label-sm text-label-sm text-on-surface-variant shrink-0 mt-1">
+              {recommendation.durationMinutes} min
+            </span>
+          </div>
+          <p className="font-body-md text-body-md text-on-surface-variant mb-3">
+            {recommendation.rationale}
+          </p>
+          <p className="font-label-md text-label-md text-primary border border-primary/30 bg-primary/5 rounded-lg px-3 py-2 inline-block">
+            {recommendation.sessionInstruction}
+          </p>
+          {recommendationPresentation.note && (
+            <p className="font-body-sm text-body-sm text-on-surface-variant mt-3 pt-3 border-t border-outline-variant">
+              {recommendationPresentation.note}
+            </p>
+          )}
+        </section>
+      )}
 
       {cards.length > 0 ? (
         <section className="flex flex-col gap-3">
