@@ -8,27 +8,50 @@ import {
   SESSION_LENGTHS,
   SubjectDraftSchema,
   AvailabilityWindowSchema,
+  AGE_BANDS,
+  AGE_BAND_LABELS,
+  STUDY_HABITS,
+  CHALLENGES,
+  TASK_TYPES,
+  TASK_FREQUENCIES,
   type SessionLength,
+  type AgeBand,
+  type TaskType,
+  type TaskFrequency,
 } from "@/lib/validation/onboarding";
 import { commitOnboardingAction } from "@/server/actions/onboarding";
 import { suggestTopicsAction } from "@/server/actions/suggestions";
+import { GoalRankingStep } from "./goal-ranking-step";
+import { MemoryGameStep } from "./memory-game-step";
 
 /**
  * Onboarding wizard — client state machine.
  *
- * Steps 1..5 = data capture, step 6 = review. All state lives in the client
+ * Steps 1–9 = data capture, step 10 = review. All state lives in the client
  * until the final "Create my plan" click — one atomic-ish save at the end.
  * Validation runs on Continue and Create only (B-i).
  */
 
-type StepIndex = 1 | 2 | 3 | 4 | 5 | 6;
+// Steps 1–9 are data-entry; 10 is review.
+type StepIndex = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+const TOTAL_DATA_STEPS = 9;
 
 type TopicDraft = { clientId: string; name: string };
+type WorkloadItemDraft = {
+  clientId: string;
+  taskType: TaskType;
+  dueDate: string | null;
+  frequency: TaskFrequency | null;
+  priority: "low" | "medium" | "high";
+};
 type SubjectDraft = {
   clientId: string;
   name: string;
   examDate: string | null;
   topics: TopicDraft[];
+  difficulty: "easy" | "medium" | "hard" | null;
+  confidencePct: number | null;
+  workloadItems: WorkloadItemDraft[];
 };
 type AvailabilityWindowDraft = {
   clientId: string;
@@ -39,30 +62,40 @@ type AvailabilityWindowDraft = {
 
 type State = {
   step: StepIndex;
+  // Core (original)
   subjects: SubjectDraft[];
   availability: AvailabilityWindowDraft[];
   sessionLengthMinutes: SessionLength | null;
+  // Extended (new onboarding steps)
+  ageBand: AgeBand | null;
+  studyHabits: string[];
+  studyChallenges: string[];
+  goalRanking: string[];
+  memoryScore: number | null;
 };
 
 type Action =
   | { type: "SET_STEP"; step: StepIndex }
   | { type: "ADD_SUBJECT"; name: string }
   | { type: "REMOVE_SUBJECT"; clientId: string }
+  | { type: "SET_DIFFICULTY"; clientId: string; difficulty: "easy" | "medium" | "hard" | null }
+  | { type: "SET_CONFIDENCE"; clientId: string; confidencePct: number | null }
+  | { type: "ADD_WORKLOAD_ITEM"; subjectClientId: string; item: Omit<WorkloadItemDraft, "clientId"> }
+  | { type: "REMOVE_WORKLOAD_ITEM"; subjectClientId: string; itemClientId: string }
   | { type: "ADD_TOPIC"; subjectClientId: string; name: string }
   | { type: "REMOVE_TOPIC"; subjectClientId: string; topicClientId: string }
   | { type: "SET_EXAM_DATE"; subjectClientId: string; date: string | null }
-  | {
-      type: "ADD_WINDOW";
-      dayOfWeek: number;
-      startsAt: string;
-      endsAt: string;
-    }
+  | { type: "ADD_WINDOW"; dayOfWeek: number; startsAt: string; endsAt: string }
   | { type: "REMOVE_WINDOW"; clientId: string }
-  | { type: "SET_SESSION_LENGTH"; minutes: SessionLength };
+  | { type: "SET_SESSION_LENGTH"; minutes: SessionLength }
+  | { type: "SET_AGE_BAND"; ageBand: AgeBand | null }
+  | { type: "TOGGLE_STUDY_HABIT"; habit: string }
+  | { type: "TOGGLE_CHALLENGE"; challenge: string }
+  | { type: "SET_GOAL_RANKING"; ranking: string[] }
+  | { type: "SET_MEMORY_SCORE"; score: number };
 
 // Counter-based client ids — collisions across a single wizard session are
-// impossible without needing crypto.randomUUID (which triggered our
-// no-Date.now-style caveats elsewhere).
+// impossible without needing crypto.randomUUID.
 let nextClientId = 1;
 const cid = () => `c${nextClientId++}`;
 
@@ -71,6 +104,11 @@ const initialState: State = {
   subjects: [],
   availability: [],
   sessionLengthMinutes: null,
+  ageBand: null,
+  studyHabits: [],
+  studyChallenges: [],
+  goalRanking: [],
+  memoryScore: null,
 };
 
 function reducer(state: State, action: Action): State {
@@ -87,7 +125,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         subjects: [
           ...state.subjects,
-          { clientId: cid(), name, examDate: null, topics: [] },
+          { clientId: cid(), name, examDate: null, topics: [], difficulty: null, confidencePct: null, workloadItems: [] },
         ],
       };
     }
@@ -95,6 +133,38 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         subjects: state.subjects.filter((s) => s.clientId !== action.clientId),
+      };
+    case "SET_DIFFICULTY":
+      return {
+        ...state,
+        subjects: state.subjects.map((s) =>
+          s.clientId === action.clientId ? { ...s, difficulty: action.difficulty } : s,
+        ),
+      };
+    case "SET_CONFIDENCE":
+      return {
+        ...state,
+        subjects: state.subjects.map((s) =>
+          s.clientId === action.clientId ? { ...s, confidencePct: action.confidencePct } : s,
+        ),
+      };
+    case "ADD_WORKLOAD_ITEM":
+      return {
+        ...state,
+        subjects: state.subjects.map((s) =>
+          s.clientId === action.subjectClientId
+            ? { ...s, workloadItems: [...s.workloadItems, { clientId: cid(), ...action.item }] }
+            : s,
+        ),
+      };
+    case "REMOVE_WORKLOAD_ITEM":
+      return {
+        ...state,
+        subjects: state.subjects.map((s) =>
+          s.clientId === action.subjectClientId
+            ? { ...s, workloadItems: s.workloadItems.filter((i) => i.clientId !== action.itemClientId) }
+            : s,
+        ),
       };
     case "ADD_TOPIC": {
       const name = action.name.trim();
@@ -160,6 +230,30 @@ function reducer(state: State, action: Action): State {
       };
     case "SET_SESSION_LENGTH":
       return { ...state, sessionLengthMinutes: action.minutes };
+    case "SET_AGE_BAND":
+      return { ...state, ageBand: action.ageBand };
+    case "TOGGLE_STUDY_HABIT": {
+      const has = state.studyHabits.includes(action.habit);
+      return {
+        ...state,
+        studyHabits: has
+          ? state.studyHabits.filter((h) => h !== action.habit)
+          : [...state.studyHabits, action.habit],
+      };
+    }
+    case "TOGGLE_CHALLENGE": {
+      const has = state.studyChallenges.includes(action.challenge);
+      return {
+        ...state,
+        studyChallenges: has
+          ? state.studyChallenges.filter((c) => c !== action.challenge)
+          : [...state.studyChallenges, action.challenge],
+      };
+    }
+    case "SET_GOAL_RANKING":
+      return { ...state, goalRanking: action.ranking };
+    case "SET_MEMORY_SCORE":
+      return { ...state, memoryScore: action.score };
   }
 }
 
@@ -169,19 +263,20 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 function validateStep(state: State): string | null {
   switch (state.step) {
     case 1:
-      if (state.subjects.length === 0) return "Add at least one subject.";
+      // Age band is optional — user can proceed without selecting.
       return null;
     case 2:
+      if (state.subjects.length === 0) return "Add at least one subject.";
+      return null;
+    case 3:
       if (state.subjects.some((s) => s.topics.length === 0)) {
         return "Add at least one topic per subject.";
       }
       return null;
-    case 3:
-      if (!state.subjects.some((s) => s.examDate !== null)) {
-        return "At least one subject needs an exam or target date.";
-      }
+    case 4:
+      // Workload items are all optional — any combination (or none) is valid.
       return null;
-    case 4: {
+    case 5: {
       if (state.availability.length === 0) {
         return "Add at least one availability window.";
       }
@@ -194,13 +289,16 @@ function validateStep(state: State): string | null {
       }
       return null;
     }
-    case 5:
+    case 6:
       if (state.sessionLengthMinutes == null) {
         return "Pick a session length.";
       }
       return null;
-    case 6:
-      // Full-input schema is validated on the server; no client-only check here.
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+      // Study habits, goal ranking, memory game, and review are all optional/server-validated.
       return null;
   }
 }
@@ -218,7 +316,7 @@ export function Wizard() {
 
   const goNext = () => {
     if (!currentValidation()) return;
-    if (state.step < 6) {
+    if (state.step < 10) {
       setError(null);
       dispatch({ type: "SET_STEP", step: (state.step + 1) as StepIndex });
     }
@@ -238,6 +336,14 @@ export function Wizard() {
         name: s.name,
         examDate: s.examDate,
         topics: s.topics.map((t) => ({ name: t.name })),
+        difficulty: s.difficulty ?? undefined,
+        confidencePct: s.confidencePct ?? undefined,
+        workloadItems: s.workloadItems.map((w) => ({
+          taskType: w.taskType,
+          dueDate: w.dueDate,
+          frequency: w.frequency ?? undefined,
+          priority: w.priority,
+        })),
       })),
       availability: state.availability.map((w) => ({
         dayOfWeek: w.dayOfWeek,
@@ -245,6 +351,11 @@ export function Wizard() {
         endsAt: w.endsAt,
       })),
       sessionLengthMinutes: state.sessionLengthMinutes,
+      ageBand: state.ageBand ?? undefined,
+      studyHabits: state.studyHabits.length > 0 ? state.studyHabits : undefined,
+      studyChallenges: state.studyChallenges.length > 0 ? state.studyChallenges : undefined,
+      goalRanking: state.goalRanking.length > 0 ? state.goalRanking : undefined,
+      memoryScore: state.memoryScore ?? undefined,
     };
 
     startTransition(async () => {
@@ -256,13 +367,13 @@ export function Wizard() {
     });
   };
 
-  const isReview = state.step === 6;
-  const stepLabel = isReview ? "Review" : `Step ${state.step} of 5`;
-  const progressPct = (state.step / 6) * 100;
+  const isReview = state.step === 10;
+  const stepLabel = isReview ? "Review" : `Step ${state.step} of ${TOTAL_DATA_STEPS}`;
+  const progressPct = (state.step / 10) * 100;
 
   return (
     <div className="min-h-full flex flex-col bg-surface text-on-surface">
-      {/* Sticky top header with logo + step indicator + progress bar (DESIGN-SPEC.md §2.16) */}
+      {/* Sticky top header with logo + step indicator + progress bar */}
       <header className="w-full max-w-[600px] mx-auto px-container-margin pt-stack-lg">
         <div className="flex items-center justify-between mb-base">
           <span className="font-display text-headline-md text-primary">Pace</span>
@@ -279,12 +390,25 @@ export function Wizard() {
       </header>
 
       <main className="flex-grow w-full max-w-[600px] mx-auto px-container-margin pt-stack-lg pb-32">
-        {state.step === 1 && <SubjectsStep state={state} dispatch={dispatch} />}
-        {state.step === 2 && <TopicsStep state={state} dispatch={dispatch} />}
-        {state.step === 3 && <ExamDatesStep state={state} dispatch={dispatch} />}
-        {state.step === 4 && <AvailabilityStep state={state} dispatch={dispatch} />}
-        {state.step === 5 && <SessionLengthStep state={state} dispatch={dispatch} />}
-        {state.step === 6 && (
+        {state.step === 1 && <AgeBandStep state={state} dispatch={dispatch} />}
+        {state.step === 2 && <SubjectsStep state={state} dispatch={dispatch} />}
+        {state.step === 3 && <TopicsStep state={state} dispatch={dispatch} />}
+        {state.step === 4 && <WorkloadStep state={state} dispatch={dispatch} />}
+        {state.step === 5 && <AvailabilityStep state={state} dispatch={dispatch} />}
+        {state.step === 6 && <SessionLengthStep state={state} dispatch={dispatch} />}
+        {state.step === 7 && <StudyHabitsStep state={state} dispatch={dispatch} />}
+        {state.step === 8 && (
+          <GoalRankingStep
+            ranking={state.goalRanking}
+            onChange={(ranking) => dispatch({ type: "SET_GOAL_RANKING", ranking })}
+          />
+        )}
+        {state.step === 9 && (
+          <MemoryGameStep
+            onScore={(score) => dispatch({ type: "SET_MEMORY_SCORE", score })}
+          />
+        )}
+        {state.step === 10 && (
           <ReviewStep state={state} onEdit={(s) => dispatch({ type: "SET_STEP", step: s })} />
         )}
 
@@ -298,7 +422,7 @@ export function Wizard() {
         )}
       </main>
 
-      {/* Fixed bottom action bar (§2.16). */}
+      {/* Fixed bottom action bar */}
       <div className="fixed bottom-0 left-0 w-full bg-surface/95 backdrop-blur-sm border-t border-outline-variant px-container-margin py-4 z-50">
         <div className="max-w-[600px] mx-auto flex justify-between items-center">
           <button
@@ -336,8 +460,84 @@ export function Wizard() {
 }
 
 // -----------------------------------------------------------------------------
-// Step 1 — Subjects
+// Step 1 — Age band (new)
 // -----------------------------------------------------------------------------
+
+const AGE_BAND_ICONS: Record<AgeBand, string> = {
+  junior: "🎒",
+  intermediate: "📚",
+  senior: "🎓",
+  university: "🏛️",
+  adult: "💼",
+};
+
+function AgeBandStep({
+  state,
+  dispatch,
+}: {
+  state: State;
+  dispatch: React.Dispatch<Action>;
+}) {
+  return (
+    <section>
+      <h1 className="font-display text-display text-primary mb-stack-sm">
+        Let&rsquo;s build your plan.
+      </h1>
+      <p className="font-body-lg text-body-lg text-on-surface-variant mb-stack-lg">
+        Which stage best describes you?
+      </p>
+      <div className="flex flex-col gap-3">
+        {AGE_BANDS.map((band) => {
+          const selected = state.ageBand === band;
+          return (
+            <button
+              key={band}
+              type="button"
+              onClick={() =>
+                dispatch({
+                  type: "SET_AGE_BAND",
+                  ageBand: selected ? null : band,
+                })
+              }
+              aria-pressed={selected}
+              className={[
+                "flex items-center gap-4 p-4 border rounded-xl bg-surface text-left transition-all",
+                selected
+                  ? "border-primary bg-secondary-container/20"
+                  : "border-outline-variant hover:border-primary",
+              ].join(" ")}
+            >
+              <span className="text-3xl" aria-hidden="true">
+                {AGE_BAND_ICONS[band]}
+              </span>
+              <span className="font-body-lg text-body-lg text-on-surface">
+                {AGE_BAND_LABELS[band]}
+              </span>
+              {selected && (
+                <span className="material-symbols-outlined text-primary ml-auto text-[20px]">
+                  check_circle
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <p className="font-body-sm text-body-sm text-outline mt-stack-md">
+        This helps Pace calibrate the difficulty and pacing of your sessions.
+      </p>
+    </section>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Step 2 — Subjects (enhanced with comma trigger + per-subject difficulty)
+// -----------------------------------------------------------------------------
+
+const DIFFICULTY_LABELS = {
+  easy: "Easy",
+  medium: "Medium",
+  hard: "Hard",
+} as const;
 
 function SubjectsStep({
   state,
@@ -347,33 +547,47 @@ function SubjectsStep({
   dispatch: React.Dispatch<Action>;
 }) {
   const [draft, setDraft] = useState("");
-  const add = () => {
-    const parsed = SubjectDraftSchema.pick({ name: true }).safeParse({
-      name: draft,
-    });
+
+  const addFromDraft = (value: string) => {
+    const parsed = SubjectDraftSchema.pick({ name: true }).safeParse({ name: value });
     if (parsed.success) {
-      dispatch({ type: "ADD_SUBJECT", name: draft });
+      dispatch({ type: "ADD_SUBJECT", name: value });
       setDraft("");
     }
   };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Comma-triggered: split on comma and add each non-empty part immediately.
+    if (value.includes(",")) {
+      const parts = value.split(",").map((p) => p.trim()).filter(Boolean);
+      for (const part of parts) {
+        dispatch({ type: "ADD_SUBJECT", name: part });
+      }
+      setDraft("");
+    } else {
+      setDraft(value);
+    }
+  };
+
   return (
     <section>
       <h1 className="font-display text-display text-primary mb-stack-sm">
-        Let&rsquo;s build your plan.
+        Your subjects
       </h1>
       <p className="font-body-lg text-body-lg text-on-surface-variant mb-stack-lg">
-        What subjects are you studying right now?
+        Type a subject and press Enter — or separate multiple with commas.
       </p>
 
       <div className="relative mb-stack-md">
         <input
           type="text"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={handleChange}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              add();
+              addFromDraft(draft);
             }
           }}
           placeholder="e.g. Biology, Math, History"
@@ -382,7 +596,7 @@ function SubjectsStep({
         />
         <button
           type="button"
-          onClick={add}
+          onClick={() => addFromDraft(draft)}
           aria-label="Add subject"
           className="absolute right-0 bottom-2 text-primary-container hover:text-primary p-2 rounded-full hover:bg-surface-container-low transition-colors"
         >
@@ -390,30 +604,102 @@ function SubjectsStep({
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {state.subjects.map((s) => (
-          <button
-            key={s.clientId}
-            type="button"
-            onClick={() =>
-              dispatch({ type: "REMOVE_SUBJECT", clientId: s.clientId })
-            }
-            aria-label={`Remove ${s.name}`}
-            className="inline-flex items-center gap-2 bg-secondary-container text-on-secondary-container px-4 py-2 rounded-full font-label-md text-label-md group cursor-pointer transition-transform hover:scale-105"
-          >
-            {s.name}
-            <span className="material-symbols-outlined text-[16px] opacity-60 group-hover:opacity-100 transition-opacity">
-              close
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* Subject list with per-subject difficulty */}
+      {state.subjects.length > 0 && (
+        <div className="space-y-3">
+          {state.subjects.map((s) => (
+            <div
+              key={s.clientId}
+              className="border border-outline-variant rounded-xl p-4 bg-surface"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-body-lg text-body-lg font-medium">{s.name}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch({ type: "REMOVE_SUBJECT", clientId: s.clientId })
+                  }
+                  aria-label={`Remove ${s.name}`}
+                  className="text-outline-variant hover:text-error transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider mr-1">
+                  Difficulty
+                </span>
+                {(["easy", "medium", "hard"] as const).map((level) => {
+                  const active = s.difficulty === level;
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() =>
+                        dispatch({
+                          type: "SET_DIFFICULTY",
+                          clientId: s.clientId,
+                          difficulty: active ? null : level,
+                        })
+                      }
+                      aria-pressed={active}
+                      className={[
+                        "px-3 py-1 rounded-full font-label-sm text-label-sm border transition-colors",
+                        active
+                          ? "border-primary bg-secondary-container/30 text-on-surface"
+                          : "border-outline-variant text-outline hover:border-primary hover:text-on-surface",
+                      ].join(" ")}
+                    >
+                      {DIFFICULTY_LABELS[level]}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-label-sm text-label-sm text-outline uppercase tracking-wider">
+                    How confident are you?
+                  </span>
+                  <span className="font-label-sm text-label-sm text-primary tabular-nums">
+                    {s.confidencePct !== null ? `${s.confidencePct}%` : "—"}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={s.confidencePct ?? 50}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_CONFIDENCE",
+                      clientId: s.clientId,
+                      confidencePct: Number(e.target.value),
+                    })
+                  }
+                  onPointerDown={() => {
+                    if (s.confidencePct === null) {
+                      dispatch({ type: "SET_CONFIDENCE", clientId: s.clientId, confidencePct: 50 });
+                    }
+                  }}
+                  aria-label={`Confidence for ${s.name}`}
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between font-label-sm text-label-sm text-outline mt-0.5">
+                  <span>Not at all</span>
+                  <span>Very confident</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
 // -----------------------------------------------------------------------------
-// Step 2 — Topics
+// Step 3 — Topics (unchanged)
 // -----------------------------------------------------------------------------
 
 function TopicsStep({
@@ -571,10 +857,7 @@ function SubjectTopics({
 
       {/* AI suggestions */}
       {suggestionsLoading && (
-        <div
-          className="flex flex-wrap gap-2 mt-3"
-          aria-label="Loading suggestions"
-        >
+        <div className="flex flex-wrap gap-2 mt-3" aria-label="Loading suggestions">
           {[88, 110, 76, 96].map((w) => (
             <div
               key={w}
@@ -611,10 +894,7 @@ function SubjectTopics({
                       : "bg-surface border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary")
                   }
                 >
-                  <span
-                    className="material-symbols-outlined text-[14px]"
-                    aria-hidden="true"
-                  >
+                  <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
                     {isAdded ? "check" : "add"}
                   </span>
                   {name}
@@ -629,10 +909,10 @@ function SubjectTopics({
 }
 
 // -----------------------------------------------------------------------------
-// Step 3 — Exam dates (per subject; native input, per A-i)
+// Step 4 — Academic workload & deadlines
 // -----------------------------------------------------------------------------
 
-function ExamDatesStep({
+function WorkloadStep({
   state,
   dispatch,
 }: {
@@ -642,46 +922,158 @@ function ExamDatesStep({
   return (
     <section>
       <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
-        When do you need to be ready?
+        What do you have coming up?
       </h1>
       <p className="font-body-md text-body-md text-on-surface-variant mb-stack-lg">
-        Add an exam or target date for each subject that has one.
+        Add upcoming tasks and deadlines. Nothing is required — skip ahead if you&rsquo;re not sure yet.
       </p>
 
-      <div className="space-y-stack-md">
-        {state.subjects.map((s) => (
-          <div
-            key={s.clientId}
-            className="flex flex-col gap-1 p-4 border border-outline-variant rounded-lg bg-surface"
-          >
-            <label
-              htmlFor={`exam-${s.clientId}`}
-              className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant"
-            >
-              {s.name}
-            </label>
-            <input
-              id={`exam-${s.clientId}`}
-              type="date"
-              value={s.examDate ?? ""}
-              onChange={(e) =>
-                dispatch({
-                  type: "SET_EXAM_DATE",
-                  subjectClientId: s.clientId,
-                  date: e.target.value || null,
-                })
-              }
-              className="bg-transparent border-0 border-b border-outline-variant focus:border-primary-container focus:ring-0 px-0 py-2 font-body-lg text-body-lg text-on-surface outline-none transition-colors"
-            />
-          </div>
-        ))}
-      </div>
+      {state.subjects.length === 0 ? (
+        <p className="font-body-md text-body-md text-outline">
+          Go back and add at least one subject first.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {state.subjects.map((s) => (
+            <SubjectWorkload key={s.clientId} subject={s} dispatch={dispatch} />
+          ))}
+        </div>
+      )}
+
+      <p className="font-body-sm text-body-sm text-outline mt-stack-md">
+        Exam dates help Pace prioritise your study sessions automatically.
+      </p>
     </section>
   );
 }
 
+function SubjectWorkload({
+  subject,
+  dispatch,
+}: {
+  subject: SubjectDraft;
+  dispatch: React.Dispatch<Action>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [taskType, setTaskType] = useState<TaskType>("exam");
+  const [dueDate, setDueDate] = useState("");
+
+  const add = () => {
+    dispatch({
+      type: "ADD_WORKLOAD_ITEM",
+      subjectClientId: subject.clientId,
+      item: { taskType, dueDate: dueDate || null, frequency: null, priority: "medium" },
+    });
+    if (taskType === "exam" && dueDate) {
+      dispatch({ type: "SET_EXAM_DATE", subjectClientId: subject.clientId, date: dueDate });
+    }
+    setOpen(false);
+    setTaskType("exam");
+    setDueDate("");
+  };
+
+  return (
+    <div className="border border-outline-variant rounded-xl p-4 bg-surface">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-body-lg text-body-lg font-medium text-on-surface">{subject.name}</span>
+        {!open && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex items-center gap-1 font-label-sm text-label-sm text-outline hover:text-primary transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            Add
+          </button>
+        )}
+      </div>
+
+      {subject.workloadItems.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {subject.workloadItems.map((item) => {
+            const typeLabel = TASK_TYPES.find((t) => t.key === item.taskType)?.label ?? item.taskType;
+            return (
+              <span
+                key={item.clientId}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-low border border-outline-variant font-label-sm text-label-sm text-on-surface"
+              >
+                {typeLabel}
+                {item.dueDate ? ` — ${item.dueDate}` : ""}
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch({
+                      type: "REMOVE_WORKLOAD_ITEM",
+                      subjectClientId: subject.clientId,
+                      itemClientId: item.clientId,
+                    })
+                  }
+                  aria-label={`Remove ${typeLabel}`}
+                  className="ml-0.5 text-outline hover:text-error transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {open && (
+        <div className="space-y-3 border-t border-outline-variant/50 pt-3">
+          <div className="flex flex-wrap gap-1.5">
+            {TASK_TYPES.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTaskType(t.key)}
+                aria-pressed={taskType === t.key}
+                className={[
+                  "px-3 py-1 rounded-full font-label-sm text-label-sm border transition-colors",
+                  taskType === t.key
+                    ? "border-primary bg-secondary-container/30 text-on-surface"
+                    : "border-outline-variant text-outline hover:border-primary hover:text-on-surface",
+                ].join(" ")}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div>
+            <label className="font-label-sm text-label-sm text-outline uppercase tracking-wider block mb-1">
+              Due date (optional)
+            </label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="bg-transparent border-b border-outline-variant focus:border-primary outline-none font-body-md text-body-md text-on-surface py-1 px-0 transition-colors"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={add}
+              className="px-4 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-opacity"
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="font-label-sm text-label-sm text-outline hover:text-on-surface transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // -----------------------------------------------------------------------------
-// Step 4 — Availability
+// Step 5 — Availability (unchanged)
 // -----------------------------------------------------------------------------
 
 function AvailabilityStep({
@@ -779,12 +1171,7 @@ function AddWindowInline({
       return;
     }
     setLocalError(null);
-    dispatch({
-      type: "ADD_WINDOW",
-      dayOfWeek: day,
-      startsAt,
-      endsAt,
-    });
+    dispatch({ type: "ADD_WINDOW", dayOfWeek: day, startsAt, endsAt });
   };
 
   return (
@@ -821,7 +1208,7 @@ function AddWindowInline({
 }
 
 // -----------------------------------------------------------------------------
-// Step 5 — Session length
+// Step 6 — Session length (unchanged)
 // -----------------------------------------------------------------------------
 
 const SESSION_DESCRIPTIONS: Record<SessionLength, string> = {
@@ -852,9 +1239,7 @@ function SessionLengthStep({
             <button
               key={minutes}
               type="button"
-              onClick={() =>
-                dispatch({ type: "SET_SESSION_LENGTH", minutes })
-              }
+              onClick={() => dispatch({ type: "SET_SESSION_LENGTH", minutes })}
               className={`text-left border rounded-xl p-6 h-full bg-surface transition-all ${
                 selected
                   ? "border-primary bg-secondary-container/20"
@@ -898,8 +1283,89 @@ function SessionLengthStep({
 }
 
 // -----------------------------------------------------------------------------
-// Step 6 — Review
+// Step 7 — Study habits + biggest challenge (new)
 // -----------------------------------------------------------------------------
+
+function StudyHabitsStep({
+  state,
+  dispatch,
+}: {
+  state: State;
+  dispatch: React.Dispatch<Action>;
+}) {
+  return (
+    <section>
+      <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
+        How do you study?
+      </h1>
+      <p className="font-body-md text-body-md text-on-surface-variant mb-stack-lg">
+        Select all that apply — Pace will build on what already works for you.
+      </p>
+
+      <div className="flex flex-wrap gap-2 mb-stack-lg">
+        {STUDY_HABITS.map(({ key, label }) => {
+          const active = state.studyHabits.includes(key);
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => dispatch({ type: "TOGGLE_STUDY_HABIT", habit: key })}
+              aria-pressed={active}
+              className={[
+                "px-4 py-2 rounded-full font-label-md text-label-md border transition-colors",
+                active
+                  ? "border-primary bg-secondary-container/30 text-on-surface"
+                  : "border-outline-variant text-on-surface-variant hover:border-primary hover:text-on-surface",
+              ].join(" ")}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-outline-variant pt-stack-md">
+        <h2 className="font-label-md text-label-md text-outline uppercase tracking-wider mb-1">
+          What are your study challenges?
+        </h2>
+        <p className="font-body-sm text-body-sm text-outline mb-3">Select all that apply.</p>
+        <div className="flex flex-wrap gap-2">
+          {CHALLENGES.map(({ key, label }) => {
+            const active = state.studyChallenges.includes(key);
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => dispatch({ type: "TOGGLE_CHALLENGE", challenge: key })}
+                aria-pressed={active}
+                className={[
+                  "px-4 py-2 rounded-full font-label-md text-label-md border transition-colors",
+                  active
+                    ? "border-primary bg-secondary-container/30 text-on-surface"
+                    : "border-outline-variant text-on-surface-variant hover:border-primary hover:text-on-surface",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Step 10 — Review (updated links point to new step numbers)
+// -----------------------------------------------------------------------------
+
+const AGE_BAND_LABEL_MAP: Record<string, string> = {
+  junior: "Junior (11–13)",
+  intermediate: "Intermediate (14–15)",
+  senior: "Senior (16–18)",
+  university: "University (18–24)",
+  adult: "Adult (24+)",
+};
 
 function ReviewStep({
   state,
@@ -935,6 +1401,13 @@ function ReviewStep({
         </p>
       </div>
       <div className="border-y border-outline-variant divide-y divide-outline-variant">
+        {state.ageBand && (
+          <ReviewRow
+            label="Stage"
+            value={AGE_BAND_LABEL_MAP[state.ageBand] ?? state.ageBand}
+            onEdit={() => onEdit(1)}
+          />
+        )}
         <ReviewRow
           label="Subjects & topics"
           value={state.subjects
@@ -943,24 +1416,25 @@ function ReviewStep({
                 `${s.name}${s.topics.length ? ` (${s.topics.map((t) => t.name).join(", ")})` : ""}`,
             )
             .join("; ")}
-          onEdit={() => onEdit(1)}
+          onEdit={() => onEdit(2)}
         />
         <ReviewRow
-          label="Target dates"
-          value={
-            state.subjects.filter((s) => s.examDate).length > 0
-              ? state.subjects
-                  .filter((s) => s.examDate)
-                  .map((s) => `${s.name}: ${s.examDate}`)
-                  .join("; ")
-              : "(none set)"
-          }
-          onEdit={() => onEdit(3)}
+          label="Deadlines & workload"
+          value={(() => {
+            const items = state.subjects.flatMap((s) =>
+              s.workloadItems.map((w) => {
+                const type = TASK_TYPES.find((t) => t.key === w.taskType)?.label ?? w.taskType;
+                return `${s.name}: ${type}${w.dueDate ? ` (${w.dueDate})` : ""}`;
+              }),
+            );
+            return items.length > 0 ? items.join("; ") : "(none added)";
+          })()}
+          onEdit={() => onEdit(4)}
         />
         <ReviewRow
           label="Weekly availability"
           value={`~${totalHours} h/week (${availabilityDays || "none"})`}
-          onEdit={() => onEdit(4)}
+          onEdit={() => onEdit(5)}
         />
         <ReviewRow
           label="Session length"
@@ -969,8 +1443,15 @@ function ReviewStep({
               ? `${state.sessionLengthMinutes} minutes`
               : "(not set)"
           }
-          onEdit={() => onEdit(5)}
+          onEdit={() => onEdit(6)}
         />
+        {state.goalRanking.length > 0 && (
+          <ReviewRow
+            label="Top goal"
+            value={state.goalRanking[0]}
+            onEdit={() => onEdit(8)}
+          />
+        )}
       </div>
     </section>
   );

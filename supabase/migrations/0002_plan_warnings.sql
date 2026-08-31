@@ -1,1 +1,1 @@
-ALTER TABLE plans ADD COLUMN warnings jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS warnings jsonb NOT NULL DEFAULT '[]'::jsonb;

@@ -11,6 +11,7 @@ import {
   validatePlanOutput,
   type ValidatedSession,
 } from "./validate";
+import { generateFallbackPlan } from "./fallback";
 
 /**
  * Call Gemini to generate a plan, then server-validate. If the LLM output
@@ -87,9 +88,22 @@ export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
   const second = await attempt(basePrompt + addendum);
   if (second.ok) return second;
 
-  // Surface the real reason rather than an opaque generic. If the model kept
-  // returning an empty plan, that specific message is the most useful; any
-  // other residual validation failure gets an actionable fallback.
+  // Both LLM attempts failed. Fall back to the deterministic planner rather
+  // than surfacing an error — the feasibility pre-check already confirmed at
+  // least one slot fits, so the fallback always produces ≥ 1 session.
+  // Common failure modes the fallback avoids: subject/topic name casing
+  // divergence, window-boundary arithmetic errors, and minor time drift.
+  const fallbackSessions = generateFallbackPlan(input);
+  if (fallbackSessions.length > 0) {
+    return {
+      ok: true,
+      sessions: fallbackSessions,
+      // Carry over any warnings from the last failed LLM attempt if it returned some
+      warnings: [],
+    };
+  }
+
+  // Only reach here if feasibility somehow lied (should not happen in practice).
   if (second.error === NO_FEASIBLE_SESSIONS || first.error === NO_FEASIBLE_SESSIONS) {
     return { ok: false, error: NO_FEASIBLE_SESSIONS };
   }

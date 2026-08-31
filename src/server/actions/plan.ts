@@ -16,6 +16,7 @@ import {
 } from "@/server/llm/diff";
 import { scorePersonalization } from "@/lib/personalization/scoring";
 import type { PersonalizationAnswers } from "@/lib/personalization/types";
+import { logAppError } from "@/lib/errors/log-error";
 
 /**
  * Plan generation + adaptive re-planning.
@@ -85,7 +86,7 @@ async function buildPlanInput(
   sessionLengthMinutes: 25 | 45 | 60,
   includeCompleted: boolean,
 ): Promise<{ ok: true; input: PlanInput; timeZone: string } | { ok: false; error: string }> {
-  const [profileRes, subjectsRes, availRes] = await Promise.all([
+  const [profileRes, subjectsRes, availRes, tasksRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("time_zone, age_group, personalization_answers, personalization_completed_at")
@@ -99,6 +100,11 @@ async function buildPlanInput(
       .from("availability_windows")
       .select("day_of_week, starts_at, ends_at")
       .eq("user_id", userId),
+    supabase
+      .from("subject_tasks")
+      .select("task_type, title, due_date, priority, subject:subjects(name)")
+      .eq("user_id", userId)
+      .eq("is_completed", false),
   ]);
   if (profileRes.error || !profileRes.data) {
     return { ok: false, error: "Could not read profile for plan generation." };
@@ -156,6 +162,31 @@ async function buildPlanInput(
     }
   }
 
+  // Map subject_tasks rows to PlanInput["tasks"] — tasksRes failure is non-fatal.
+  type TaskRow = {
+    task_type: string;
+    title: string | null;
+    due_date: string | null;
+    priority: string;
+    subject: { name: string } | { name: string }[] | null;
+  };
+  const tasks: PlanInput["tasks"] =
+    tasksRes.data && tasksRes.data.length > 0
+      ? (tasksRes.data as TaskRow[])
+          .filter((t) => t.title)
+          .map((t) => {
+            const subj = Array.isArray(t.subject) ? t.subject[0] : t.subject;
+            return {
+              title: t.title as string,
+              taskType: t.task_type,
+              subjectName: subj?.name ?? "",
+              dueDate: t.due_date ?? null,
+              priority: (t.priority as "low" | "medium" | "high") ?? "medium",
+            };
+          })
+          .filter((t) => t.subjectName)
+      : undefined;
+
   const input: PlanInput = {
     timeZone,
     now: new Date(),
@@ -174,6 +205,7 @@ async function buildPlanInput(
       endsAt: (w.ends_at as string).slice(0, 5),
     })),
     completedSessions,
+    tasks,
     profile: planProfile,
   };
 
@@ -212,6 +244,18 @@ export async function generatePlanForUser(
     .select("id")
     .single();
   if (planErr || !planRow) {
+    await logAppError(
+      "plan_generation",
+      planErr?.message ?? "plans insert returned no data",
+      {
+        step: "insert_plan",
+        code: planErr?.code,
+        details: planErr?.details,
+        hint: planErr?.hint,
+        userId,
+      },
+      userId,
+    );
     return { ok: false, error: "Could not save the generated plan." };
   }
   const planId = planRow.id as string;

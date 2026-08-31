@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SessionIdSchema } from "@/lib/validation/sessions";
 import { rePlanForUser } from "@/server/actions/plan";
 import type { PlanChange, PlanWarning } from "@/server/llm/diff";
+import { computeNewMastery } from "@/lib/mastery/update";
 
 /**
  * Session mutations for the /today dashboard.
@@ -76,7 +77,11 @@ export async function detectAndMarkMissedAction(
   return { ok: true, count: ids.length };
 }
 
-export async function markDoneAction(sessionId: string): Promise<DoneResult> {
+export async function markDoneAction(
+  sessionId: string,
+  focusLossCount = 0,
+  elapsedSeconds = 0,
+): Promise<DoneResult> {
   const parsed = SessionIdSchema.safeParse({ sessionId });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0].message };
@@ -87,6 +92,14 @@ export async function markDoneAction(sessionId: string): Promise<DoneResult> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "You need to be signed in." };
+
+  // Fetch the session's topic_id so we can update mastery.
+  const { data: sessionRow } = await supabase
+    .from("sessions")
+    .select("topic_id, duration_minutes")
+    .eq("id", parsed.data.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   const { error } = await supabase
     .from("sessions")
@@ -99,6 +112,51 @@ export async function markDoneAction(sessionId: string): Promise<DoneResult> {
     return { ok: false, error: "We couldn't update that session. Try again." };
   }
 
+  // Record session event (fire-and-forget; failure is non-fatal).
+  void supabase.from("session_events").insert({
+    user_id: user.id,
+    study_session_id: parsed.data.sessionId,
+    event_type: "completed",
+    metadata: { elapsed_seconds: elapsedSeconds, focus_loss_count: focusLossCount },
+  });
+
+  // Update topic mastery via UPSERT.
+  if (sessionRow?.topic_id) {
+    const topicId = sessionRow.topic_id as string;
+    const { data: existing } = await supabase
+      .from("topic_mastery")
+      .select("mastery_pct, sessions_completed, sessions_total")
+      .eq("user_id", user.id)
+      .eq("topic_id", topicId)
+      .maybeSingle();
+
+    const oldMastery = (existing?.mastery_pct as number | null) ?? 0;
+    const newMastery = computeNewMastery(oldMastery, true);
+    const sessionsCompleted = ((existing?.sessions_completed as number | null) ?? 0) + 1;
+    const sessionsTotal = ((existing?.sessions_total as number | null) ?? 0) + 1;
+
+    void supabase.from("topic_mastery").upsert({
+      user_id: user.id,
+      topic_id: topicId,
+      mastery_pct: newMastery,
+      sessions_completed: sessionsCompleted,
+      sessions_total: sessionsTotal,
+      last_session_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,topic_id" });
+  }
+
+  // Write analytics event (fire-and-forget).
+  void supabase.from("analytics_events").insert({
+    user_id: user.id,
+    event_type: "session_completed",
+    metadata: {
+      session_id: parsed.data.sessionId,
+      elapsed_seconds: elapsedSeconds,
+      focus_loss_count: focusLossCount,
+    },
+  });
+
   revalidatePath("/today");
   revalidatePath("/plan");
   return { ok: true };
@@ -106,6 +164,7 @@ export async function markDoneAction(sessionId: string): Promise<DoneResult> {
 
 export async function markMissedAction(
   sessionId: string,
+  elapsedSeconds = 0,
 ): Promise<MissedResult> {
   const parsed = SessionIdSchema.safeParse({ sessionId });
   if (!parsed.success) {
@@ -118,8 +177,15 @@ export async function markMissedAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "You need to be signed in." };
 
-  // Mark missed (no-op if already missed — makes retry safe). We ignore the
-  // 0-rows case on purpose so a retried replan still runs.
+  // Fetch topic for mastery update.
+  const { data: sessionRow } = await supabase
+    .from("sessions")
+    .select("topic_id")
+    .eq("id", parsed.data.sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  // Mark missed (no-op if already missed — makes retry safe).
   const { error: updErr } = await supabase
     .from("sessions")
     .update({ status: "missed" })
@@ -129,6 +195,45 @@ export async function markMissedAction(
   if (updErr) {
     return { ok: false, error: "We couldn't mark that session missed. Try again." };
   }
+
+  // Record event + update mastery (fire-and-forget).
+  const eventType = elapsedSeconds > 60 ? "abandoned" : "abandoned";
+  void supabase.from("session_events").insert({
+    user_id: user.id,
+    study_session_id: parsed.data.sessionId,
+    event_type: eventType,
+    metadata: { elapsed_seconds: elapsedSeconds },
+  });
+
+  if (sessionRow?.topic_id) {
+    const topicId = sessionRow.topic_id as string;
+    const { data: existing } = await supabase
+      .from("topic_mastery")
+      .select("mastery_pct, sessions_completed, sessions_total")
+      .eq("user_id", user.id)
+      .eq("topic_id", topicId)
+      .maybeSingle();
+
+    const oldMastery = (existing?.mastery_pct as number | null) ?? 0;
+    const newMastery = computeNewMastery(oldMastery, false);
+    const sessionsTotal = ((existing?.sessions_total as number | null) ?? 0) + 1;
+
+    void supabase.from("topic_mastery").upsert({
+      user_id: user.id,
+      topic_id: topicId,
+      mastery_pct: newMastery,
+      sessions_completed: (existing?.sessions_completed as number | null) ?? 0,
+      sessions_total: sessionsTotal,
+      last_session_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,topic_id" });
+  }
+
+  void supabase.from("analytics_events").insert({
+    user_id: user.id,
+    event_type: "session_abandoned",
+    metadata: { session_id: parsed.data.sessionId, elapsed_seconds: elapsedSeconds },
+  });
 
   // Adaptive re-plan of the remaining schedule.
   const replan = await rePlanForUser(supabase, user.id);

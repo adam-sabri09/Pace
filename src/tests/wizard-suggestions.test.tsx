@@ -24,6 +24,9 @@ async function navigateToTopicsStep(
 ) {
   mockSuggestTopics.mockResolvedValue({ [subjectName]: suggestions });
   render(<Wizard />);
+  // Step 1 is now the age-band selector — skip it (no required input).
+  await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
+  // Step 2 is subjects.
   await userEvent.type(
     screen.getByPlaceholderText(/e\.g\. Biology/i),
     subjectName,
@@ -91,6 +94,7 @@ describe("TopicsStep — AI suggestions", () => {
   it("does not show suggestion chips when the action returns empty", async () => {
     mockSuggestTopics.mockResolvedValue({});
     render(<Wizard />);
+    await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
     await userEvent.type(
       screen.getByPlaceholderText(/e\.g\. Biology/i),
       "Biology",
@@ -112,6 +116,7 @@ describe("TopicsStep — AI suggestions", () => {
   it("still renders the topics step when suggestTopicsAction rejects", async () => {
     mockSuggestTopics.mockRejectedValue(new Error("AI failure"));
     render(<Wizard />);
+    await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
     await userEvent.type(
       screen.getByPlaceholderText(/e\.g\. Biology/i),
       "Biology",

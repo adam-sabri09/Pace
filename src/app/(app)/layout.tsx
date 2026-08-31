@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { BottomNav, SideNav, TopAppBar } from "@/components/nav/shell";
 import { createClient } from "@/lib/supabase/server";
 
+const ADMIN_EMAILS = ["adam.sabri@mal.ai"];
+
 /**
- * Authenticated shell applied to /today, /plan, /subjects, /settings.
+ * Authenticated shell applied to /today, /plan, /subjects, /settings, /admin.
  * The onboarding route stays outside this group (focus screen, no nav).
  * A single server-side auth check gates every child route here.
  */
@@ -19,16 +21,18 @@ export default async function AppShellLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const isAdmin = ADMIN_EMAILS.map((e) => e.toLowerCase()).includes((user.email ?? "").toLowerCase());
+
   return (
     <div className="min-h-full flex flex-col md:flex-row bg-background text-on-surface">
-      <SideNav />
+      <SideNav isAdmin={isAdmin} />
       <TopAppBar />
       <div className="w-full min-h-full md:pl-64 flex flex-col">
         <div className="pt-14 md:pt-0 pb-24 md:pb-0 flex-grow flex flex-col">
           {children}
         </div>
       </div>
-      <BottomNav />
+      <BottomNav isAdmin={isAdmin} />
     </div>
   );
 }

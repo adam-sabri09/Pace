@@ -75,6 +75,14 @@ export type PlanInput = {
     startsAt: string; // ISO
     durationMinutes: number;
   }>;
+  /** Upcoming homework / assignments / quizzes / exams from subject_tasks. */
+  tasks?: Array<{
+    title: string;
+    taskType: string; // homework | assignment | project | quiz | exam | other
+    subjectName: string;
+    dueDate: string | null; // YYYY-MM-DD
+    priority: "low" | "medium" | "high";
+  }>;
   profile?: {
     ageGroup: "younger" | "older" | "adult";
     topTechnique: string; // TechniqueKey

@@ -84,6 +84,19 @@ export function buildPrompt(input: PlanInput): string {
       })()
     : "";
 
+  const tasksBlock =
+    input.tasks && input.tasks.length > 0
+      ? "\nUpcoming tasks / deadlines (prioritise study sessions for these):\n" +
+        input.tasks
+          .filter((t) => !t.dueDate || t.dueDate >= nowLocal.dateString)
+          .sort((a, b) => (a.dueDate ?? "9999") < (b.dueDate ?? "9999") ? -1 : 1)
+          .map(
+            (t) =>
+              `  - [${t.taskType.toUpperCase()}] ${t.title} (${t.subjectName})${t.dueDate ? ` — due ${t.dueDate}` : ""} — priority: ${t.priority}`,
+          )
+          .join("\n")
+      : "";
+
   return `You are Pace, an adaptive study planner for high-school students.
 Build a realistic, day-by-day study schedule.
 
@@ -97,6 +110,7 @@ ${subjectBlock}
 Weekly availability windows (student's local time):
 ${availabilityBlock}
 ${completedBlock}
+${tasksBlock}
 ${profileBlock}
 Rules:
 1. Every session's startsAt is a local wall-clock string in the student's

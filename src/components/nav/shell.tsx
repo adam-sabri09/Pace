@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
  */
 
 type Item = {
-  href: "/today" | "/plan" | "/subjects" | "/upload-schedule" | "/settings";
+  href: string;
   label: string;
   icon: string;
 };
@@ -20,6 +20,7 @@ const ITEMS: Item[] = [
   { href: "/today", label: "Today", icon: "calendar_today" },
   { href: "/plan", label: "Plan", icon: "event_note" },
   { href: "/subjects", label: "Subjects", icon: "menu_book" },
+  { href: "/coach", label: "Coach", icon: "chat" },
   { href: "/upload-schedule", label: "Upload", icon: "upload" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];
@@ -29,8 +30,11 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SideNav() {
+export function SideNav({ isAdmin }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const items = isAdmin
+    ? [...ITEMS, { href: "/admin", label: "Admin", icon: "admin_panel_settings" }]
+    : ITEMS;
   return (
     <nav
       aria-label="Primary"
@@ -43,7 +47,7 @@ export function SideNav() {
         </p>
       </div>
       <ul className="flex flex-col gap-base">
-        {ITEMS.map((item) => {
+        {items.map((item) => {
           const active = isActive(pathname, item.href);
           return (
             <li key={item.href}>
@@ -82,14 +86,17 @@ export function TopAppBar() {
   );
 }
 
-export function BottomNav() {
+export function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const items = isAdmin
+    ? [...ITEMS, { href: "/admin", label: "Admin", icon: "admin_panel_settings" }]
+    : ITEMS;
   return (
     <nav
       aria-label="Primary"
       className="fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-2 md:hidden bg-surface border-t border-outline-variant z-50 pb-safe"
     >
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
           <Link
