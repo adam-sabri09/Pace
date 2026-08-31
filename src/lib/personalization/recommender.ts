@@ -13,14 +13,13 @@ const DIFFICULTY_WEIGHT: Record<Difficulty, number> = {
 
 function urgencyScore(examDate: string | null, todayIso: string): number {
   if (!examDate) return 1; // no exam → low urgency
-  const days = Math.max(
-    1,
-    Math.round(
-      (new Date(examDate + 'T00:00:00Z').getTime() -
-        new Date(todayIso + 'T00:00:00Z').getTime()) /
-        (24 * 60 * 60 * 1000),
-    ),
+  const days = Math.round(
+    (new Date(examDate + 'T00:00:00Z').getTime() -
+      new Date(todayIso + 'T00:00:00Z').getTime()) /
+      (24 * 60 * 60 * 1000),
   );
+  // Past exam: treat same as no exam — the student should focus on what's ahead.
+  if (days < 0) return 1;
   if (days <= 7) return 10;
   if (days <= 14) return 7;
   if (days <= 30) return 5;
@@ -82,10 +81,19 @@ export function buildTodayRecommendation(
         : 'this subject';
 
   const urgency = urgencyScore(top.examDate, todayIso);
+  const rawDays = top.examDate
+    ? Math.round(
+        (new Date(top.examDate + 'T00:00:00Z').getTime() -
+          new Date(todayIso + 'T00:00:00Z').getTime()) /
+          (24 * 60 * 60 * 1000),
+      )
+    : null;
   const daysLabel =
-    top.examDate
-      ? `${Math.max(1, Math.round((new Date(top.examDate + 'T00:00:00Z').getTime() - new Date(todayIso + 'T00:00:00Z').getTime()) / (24 * 60 * 60 * 1000)))} days until the exam`
-      : 'no exam date set';
+    rawDays == null
+      ? 'no exam date set'
+      : rawDays < 0
+        ? 'exam has passed'
+        : `${rawDays} day${rawDays === 1 ? '' : 's'} until the exam`;
 
   let rationale = `${top.subjectName} is the highest priority today`;
   if (urgency >= 7) {

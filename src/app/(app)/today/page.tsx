@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SessionCard, type SessionStatus } from "@/components/session-card";
 import { localWallClockToUTC, utcToLocalParts } from "@/server/llm/time";
 import { PersonalizationCta } from "@/components/personalization-cta";
+import { detectAndMarkMissedAction } from "@/server/actions/sessions";
 import { buildTodayRecommendation } from "@/lib/personalization/recommender";
 import { scorePersonalization } from "@/lib/personalization/scoring";
 import { getRecommendationPresentation } from "@/lib/personalization/recommendation-presentation";
@@ -42,6 +43,10 @@ export default async function TodayPage() {
     `${localNow.dateString}T23:59`,
     timeZone,
   ).toISOString();
+
+  // Silently mark sessions from before today as missed. Idempotent — if none
+  // remain scheduled from past days, this returns immediately with count 0.
+  await detectAndMarkMissedAction(dayStartUTC);
 
   const [examRes, sessionsRes, subjectsRes] = await Promise.all([
     supabase
