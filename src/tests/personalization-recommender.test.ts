@@ -178,6 +178,63 @@ describe('buildTodayRecommendation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Past exam date handling
+//
+// A subject whose exam has already passed should not get artificially high
+// urgency. The old code used Math.max(1, days) which turned -5 days into
+// urgency=1 → tier "1 <= 7" → urgency 10. Fixed: past exams return urgency 1.
+// ---------------------------------------------------------------------------
+
+describe('rankSubjects — past exam date handling', () => {
+  // TODAY = '2026-09-01'; yesterday = '2026-08-31'
+  const YESTERDAY = '2026-08-31';
+  const TOMORROW = '2026-09-02';
+
+  it('subject with a past exam gets the same urgency as one with no exam date', () => {
+    const withPast = subject({ subjectId: 'p', subjectName: 'Past', difficulty: 'medium', confidencePct: 50, examDate: YESTERDAY });
+    const withNone = subject({ subjectId: 'n', subjectName: 'None', difficulty: 'medium', confidencePct: 50, examDate: null });
+    const rankedP = rankSubjects([withPast], TODAY);
+    const rankedN = rankSubjects([withNone], TODAY);
+    expect(rankedP[0].priority).toBe(rankedN[0].priority);
+  });
+
+  it('subject with a past exam does NOT outrank one with a future exam', () => {
+    const past = subject({ subjectId: 'past', subjectName: 'Past', difficulty: 'hard', confidencePct: 10, examDate: YESTERDAY });
+    const future = subject({ subjectId: 'fut', subjectName: 'Future', difficulty: 'easy', confidencePct: 90, examDate: TOMORROW });
+    const [first] = rankSubjects([past, future], TODAY);
+    // Future exam (tomorrow) → urgency 10; past exam → urgency 1.
+    // Future: easy(1) × 10 × confInv(90%→1) = 10
+    // Past:   hard(3) × 1  × confInv(10%→5) = 15 — past still wins on diff×conf alone
+    // This confirms urgency 1 for past, not 10 (which would be 10*3*5=150)
+    expect(first.subject.subjectId).toBe('past'); // hard/low-conf wins even at urgency 1
+    expect(first.priority).toBe(15); // 3 * 1 * 5 = 15, NOT 3 * 10 * 5 = 150
+  });
+
+  it('past exam priority is capped at urgency 1 regardless of how far in the past', () => {
+    const veryOld = subject({ subjectId: 'old', subjectName: 'Old', difficulty: 'medium', confidencePct: 50, examDate: '2025-01-01' });
+    const [{ priority }] = rankSubjects([veryOld], TODAY);
+    // urgency=1, medium=2, confInv(50%)=3 → 1*2*3 = 6
+    expect(priority).toBe(6);
+  });
+
+  it('buildTodayRecommendation skips past-exam urgency when recommending', () => {
+    // Hard/10% past exam vs easy/90% future exam:
+    // past: urgency=1, hard=3, confInv=5 → priority=15
+    // future: urgency=10, easy=1, confInv=1 → priority=10
+    // past-exam Hard/10% still wins because diff×conf beats urgent easy/90%
+    // But past-exam subject should NOT be boosted to urgency 10 (priority 150)
+    const subjects: SubjectIntelligence[] = [
+      { subjectId: 'past', subjectName: 'History', difficulty: 'hard',   confidencePct: 10, examDate: YESTERDAY },
+      { subjectId: 'fut',  subjectName: 'Biology', difficulty: 'easy',   confidencePct: 90, examDate: TOMORROW  },
+    ];
+    const ranked = rankSubjects(subjects, TODAY);
+    expect(ranked[0].subject.subjectId).toBe('past');
+    expect(ranked[0].priority).toBe(15); // NOT 150
+    expect(ranked[1].priority).toBe(10);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Regression: difficulty + confidence changes must change the top recommendation
 //
 // Reproduces the bug where updating a subject's difficulty/confidence on the

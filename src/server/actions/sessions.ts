@@ -32,6 +32,50 @@ export type MissedResult =
   | { ok: true; changes: PlanChange[]; warnings: PlanWarning[] }
   | { ok: false; error: string };
 
+export type DetectMissedResult =
+  | { ok: true; count: number }
+  | { ok: false; error: string };
+
+/**
+ * detectAndMarkMissedAction (auto-detection)
+ *
+ * Marks all `scheduled` sessions whose starts_at is before dayStartUtc as
+ * `missed`. Called silently on page load — no replan, no overlay. Idempotent:
+ * subsequent calls find 0 past-scheduled rows and return count 0.
+ */
+export async function detectAndMarkMissedAction(
+  dayStartUtc: string,
+): Promise<DetectMissedResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You need to be signed in." };
+
+  const { data: past, error: selErr } = await supabase
+    .from("sessions")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "scheduled")
+    .lt("starts_at", dayStartUtc);
+
+  if (selErr) return { ok: false, error: "Could not check for missed sessions." };
+  if (!past || past.length === 0) return { ok: true, count: 0 };
+
+  const ids = past.map((s) => s.id as string);
+  const { error: updErr } = await supabase
+    .from("sessions")
+    .update({ status: "missed" })
+    .in("id", ids)
+    .eq("user_id", user.id);
+
+  if (updErr) return { ok: false, error: "Could not mark missed sessions." };
+
+  revalidatePath("/today");
+  revalidatePath("/plan");
+  return { ok: true, count: ids.length };
+}
+
 export async function markDoneAction(sessionId: string): Promise<DoneResult> {
   const parsed = SessionIdSchema.safeParse({ sessionId });
   if (!parsed.success) {
