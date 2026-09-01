@@ -6,12 +6,12 @@ import { generateObject } from "ai";
 import { PlanOutputSchema, type PlanInput, type PlanOutput } from "./schema";
 import { buildPrompt } from "./prompt";
 import {
-  latestExamDateOf,
   sanitizeWarnings,
   validatePlanOutput,
   type ValidatedSession,
 } from "./validate";
 import { generateFallbackPlan } from "./fallback";
+import { utcToLocalParts } from "./time";
 
 /**
  * Call Gemini to generate a plan, then server-validate. If the LLM output
@@ -29,13 +29,10 @@ import { generateFallbackPlan } from "./fallback";
 // quality; single-line swap if a future deprecation moves us again.
 const MODEL_ID = "gemini-3.6-flash";
 
-// Surfaced when the model returns a valid but EMPTY plan — i.e. the
-// constraints leave no room for any session before the exam (e.g. all
-// availability falls after the exam date). The feasibility pre-check in
-// validate.ts catches the common cases earlier with more specific text; this
-// is the backstop for residual infeasible inputs.
+// Surfaced when the model returns a valid but EMPTY plan. The feasibility
+// pre-check in validate.ts catches the common cases; this is the backstop.
 const NO_FEASIBLE_SESSIONS =
-  "We couldn't fit any study sessions before your exam date. Add more available time, or move your exam date further out.";
+  "We couldn't fit any study sessions in your available time. Try adding more availability or choosing a shorter session length.";
 
 export type GenerateResult =
   | {
@@ -48,7 +45,14 @@ export type GenerateResult =
 export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
   const model = google(MODEL_ID);
   const basePrompt = buildPrompt(input);
-  const latestExam = latestExamDateOf(input);
+  // Only use future exam dates — a past exam must not constrain future sessions.
+  const todayDateStr = utcToLocalParts(input.now, input.timeZone).dateString;
+  const latestExam =
+    input.subjects
+      .map((s) => s.examDate)
+      .filter((d): d is string => d != null && d > todayDateStr)
+      .sort()
+      .pop() ?? null;
 
   const attempt = async (prompt: string): Promise<GenerateResult> => {
     let raw: PlanOutput;
@@ -110,6 +114,6 @@ export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
   return {
     ok: false,
     error:
-      "We couldn't build a plan that fits your available time. Try adding more availability, reducing topics, or moving your exam date.",
+      "We couldn't build a plan that fits your available time. Try adding more availability or choosing a shorter session length.",
   };
 }

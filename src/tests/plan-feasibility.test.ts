@@ -21,28 +21,31 @@ describe("checkPlanFeasibility", () => {
     expect(checkPlanFeasibility(base()).ok).toBe(true);
   });
 
-  it("rejects when the latest exam date is in the past", () => {
-    const r = checkPlanFeasibility(
-      base({ subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-20", topics: [] }] }),
-    );
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/future/i);
+  it("accepts when the latest exam date is in the past (falls back to 28-day horizon)", () => {
+    // Past exam → use 28-day default. Pace still plans for the subject.
+    expect(
+      checkPlanFeasibility(
+        base({ subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-20", topics: [] }] }),
+      ).ok,
+    ).toBe(true);
   });
 
-  it("rejects when the exam date is today (too tight)", () => {
-    const r = checkPlanFeasibility(
-      base({ subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-25", topics: [] }] }),
-    );
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/future/i);
+  it("accepts when the exam date is today (falls back to 28-day horizon)", () => {
+    // Exam today has passed as a planning target; 28-day default takes over.
+    expect(
+      checkPlanFeasibility(
+        base({ subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-25", topics: [] }] }),
+      ).ok,
+    ).toBe(true);
   });
 
-  it("rejects when no subject has an exam date", () => {
-    const r = checkPlanFeasibility(
-      base({ subjects: [{ id: "s1", name: "Biology", examDate: null, topics: [] }] }),
-    );
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/future/i);
+  it("accepts when no subject has an exam date (uses 28-day default horizon)", () => {
+    // Exams are optional — tasks or general study drive the plan.
+    expect(
+      checkPlanFeasibility(
+        base({ subjects: [{ id: "s1", name: "Biology", examDate: null, topics: [] }] }),
+      ).ok,
+    ).toBe(true);
   });
 
   it("accepts an exam date one day in the future", () => {
@@ -78,29 +81,32 @@ describe("checkPlanFeasibility", () => {
     ).toBe(true);
   });
 
-  it("uses the user's timezone for 'today' (exam date compared to local date)", () => {
+  it("falls back to 28-day horizon even when exam date matches today in local timezone", () => {
     // now is 2026-08-25T09:00Z; in Africa/Casablanca that's 2026-08-25 local.
-    const r = checkPlanFeasibility(
-      base({ subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-25", topics: [] }] }),
-    );
-    expect(r.ok).toBe(false);
+    // Exam today is not a future exam, so Pace uses the 28-day default — still feasible.
+    expect(
+      checkPlanFeasibility(
+        base({ subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-25", topics: [] }] }),
+      ).ok,
+    ).toBe(true);
   });
 });
 
 describe("checkPlanFeasibility check 3 — short scheduling window", () => {
-  it("rejects when exam is tomorrow and today's only window has already closed", () => {
-    // Tuesday 18:30 UTC; Tue window closes at 18:00 — too late for a 45-min session.
-    // Exam is Wednesday; no Wednesday availability. Zero schedulable slots.
-    const r = checkPlanFeasibility(
-      base({
-        timeZone: "UTC",
-        now: new Date("2026-08-25T18:30:00Z"),
-        subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-26", topics: [] }],
-        availability: [{ dayOfWeek: 2, startsAt: "16:00", endsAt: "18:00" }],
-      }),
-    );
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/no study slots/i);
+  it("accepts when exam is tomorrow and today's only window closed (28-day horizon includes future slots)", () => {
+    // Tuesday 18:30 UTC; Tue window closes at 18:00. Exam is Wednesday with no Wed slot.
+    // Old logic rejected this because no slots existed before the exam date.
+    // New logic: horizon = max(2026-08-26, 28 days) = 28 days. Next Tuesday is feasible.
+    expect(
+      checkPlanFeasibility(
+        base({
+          timeZone: "UTC",
+          now: new Date("2026-08-25T18:30:00Z"),
+          subjects: [{ id: "s1", name: "Biology", examDate: "2026-08-26", topics: [] }],
+          availability: [{ dayOfWeek: 2, startsAt: "16:00", endsAt: "18:00" }],
+        }),
+      ).ok,
+    ).toBe(true);
   });
 
   it("accepts when exam is tomorrow and tomorrow has its own availability", () => {

@@ -3,7 +3,6 @@ import "server-only";
 import type { PlanInput } from "./schema";
 import type { ValidatedSession } from "./validate";
 import { hhmmToMinutes, localWallClockToUTC, utcToLocalParts } from "./time";
-import { latestExamDateOf } from "./validate";
 
 /**
  * Deterministic fallback plan generator.
@@ -50,6 +49,30 @@ function computeUrgency(examDate: string | null, todayStr: string): number {
   return 1;
 }
 
+/** Urgency score driven by the nearest upcoming task for this subject. */
+function computeTaskUrgency(
+  subjectName: string,
+  tasks: PlanInput["tasks"],
+  todayStr: string,
+): number {
+  if (!tasks || tasks.length === 0) return 1;
+  const soonest = tasks
+    .filter((t) => t.subjectName.toLowerCase() === subjectName.toLowerCase() && t.dueDate)
+    .map((t) => t.dueDate as string)
+    .sort()[0];
+  if (!soonest) return 1;
+  if (soonest <= todayStr) return 15; // overdue
+  const days = Math.round(
+    (new Date(soonest + "T00:00:00Z").getTime() - new Date(todayStr + "T00:00:00Z").getTime()) /
+      86_400_000,
+  );
+  if (days <= 1) return 12;
+  if (days <= 3) return 10;
+  if (days <= 7) return 7;
+  if (days <= 14) return 4;
+  return 2;
+}
+
 type PrioritizedTopic = {
   topicId: string;
   subjectName: string;
@@ -80,13 +103,16 @@ function buildTopicCycle(input: PlanInput, todayStr: string): PrioritizedTopic[]
   const DW: Record<string, number> = { hard: 3, medium: 2, easy: 1 };
 
   const scoredSubjects = input.subjects
-    .filter((s) => s.topics.length > 0 && !(s.examDate && s.examDate < todayStr))
+    .filter((s) => s.topics.length > 0)
     .map((s) => {
       const si = input.profile?.subjectIntelligence?.find((p) => p.subjectName === s.name);
       const dw = DW[si?.difficulty ?? "medium"] ?? 2;
       const cp = si?.confidencePct;
       const cw = cp == null ? 2 : cp <= 20 ? 5 : cp <= 40 ? 4 : cp <= 60 ? 3 : cp <= 80 ? 2 : 1;
-      const uw = computeUrgency(s.examDate, todayStr);
+      // Use whichever urgency signal is higher: exam date or upcoming task.
+      const examUrgency = computeUrgency(s.examDate, todayStr);
+      const taskUrgency = computeTaskUrgency(s.name, input.tasks, todayStr);
+      const uw = Math.max(examUrgency, taskUrgency);
       return { subject: s, score: dw * uw * cw };
     })
     .sort((a, b) => b.score - a.score);
@@ -126,9 +152,25 @@ export function generateFallbackPlan(input: PlanInput): ValidatedSession[] {
   const cycle = buildTopicCycle(input, todayStr);
   if (!cycle.length) return [];
 
-  // Plan horizon: up to latest exam date, or 28 days.
-  const latestExamStr = latestExamDateOf(input);
-  const horizonStr = latestExamStr ?? addDays(todayStr, 28);
+  // Plan horizon: max(future exam date, future task due date, 28 days).
+  // Past exam dates are excluded — they would set the horizon in the past.
+  const futureExam =
+    input.subjects
+      .map((s) => s.examDate)
+      .filter((d): d is string => d != null && d > todayStr)
+      .sort()
+      .pop() ?? null;
+  const latestTaskDue =
+    (input.tasks ?? [])
+      .map((t) => t.dueDate)
+      .filter((d): d is string => d != null && d > todayStr)
+      .sort()
+      .pop() ?? null;
+  const horizonStr =
+    [futureExam, latestTaskDue, addDays(todayStr, 28)]
+      .filter((d): d is string => d != null)
+      .sort()
+      .pop() ?? addDays(todayStr, 28);
 
   // Availability windows by day-of-week (in minutes-in-day).
   const windowsByDow = new Map<number, Array<{ sm: number; em: number }>>();

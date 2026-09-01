@@ -1,6 +1,12 @@
 import type { PlanInput } from "./schema";
 import { utcToLocalParts } from "./time";
 
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(dateStr + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * Build the prompt Gemini receives. Pure function of PlanInput — no
  * side effects, easily unit-testable.
@@ -8,6 +14,27 @@ import { utcToLocalParts } from "./time";
 export function buildPrompt(input: PlanInput): string {
   const nowLocal = utcToLocalParts(input.now, input.timeZone);
   const nowStr = `${nowLocal.dateString} ${nowLocal.timeString} local`;
+
+  // Planning horizon: max(future exam, future task due date, 28 days).
+  const todayDateStr = nowLocal.dateString;
+  const futureExam =
+    input.subjects
+      .map((s) => s.examDate)
+      .filter((d): d is string => d != null && d > todayDateStr)
+      .sort()
+      .pop() ?? null;
+  const latestTaskDue =
+    (input.tasks ?? [])
+      .map((t) => t.dueDate)
+      .filter((d): d is string => d != null && d > todayDateStr)
+      .sort()
+      .pop() ?? null;
+  const defaultHorizon = addDays(todayDateStr, 28);
+  const horizon =
+    [futureExam, latestTaskDue, defaultHorizon]
+      .filter((d): d is string => d != null)
+      .sort()
+      .pop() ?? defaultHorizon;
 
   const subjectBlock = input.subjects
     .map((s) => {
@@ -86,14 +113,13 @@ export function buildPrompt(input: PlanInput): string {
 
   const tasksBlock =
     input.tasks && input.tasks.length > 0
-      ? "\nUpcoming tasks / deadlines (prioritise study sessions for these):\n" +
+      ? "\nTasks and deadlines (schedule study sessions to cover these — overdue tasks are highest priority):\n" +
         input.tasks
-          .filter((t) => !t.dueDate || t.dueDate >= nowLocal.dateString)
           .sort((a, b) => (a.dueDate ?? "9999") < (b.dueDate ?? "9999") ? -1 : 1)
-          .map(
-            (t) =>
-              `  - [${t.taskType.toUpperCase()}] ${t.title} (${t.subjectName})${t.dueDate ? ` — due ${t.dueDate}` : ""} — priority: ${t.priority}`,
-          )
+          .map((t) => {
+            const overdue = t.dueDate && t.dueDate < todayDateStr;
+            return `  - [${t.taskType.toUpperCase()}] ${t.title} (${t.subjectName})${t.dueDate ? ` — due ${t.dueDate}${overdue ? " ⚠ OVERDUE" : ""}` : ""} — priority: ${t.priority}`;
+          })
           .join("\n")
       : "";
 
@@ -102,6 +128,7 @@ Build a realistic, day-by-day study schedule.
 
 Student's timezone: ${input.timeZone}
 Right now: ${nowStr}
+Planning horizon: ${horizon} (schedule sessions from now until this date)
 Fixed session length: ${input.sessionLengthMinutes} minutes (every session must be exactly this)
 
 Subjects and topics:
@@ -121,10 +148,16 @@ Rules:
 4. Leave at least a 5-minute gap between consecutive same-day sessions
    (implicit break; do not schedule a "break" session).
 5. Sessions must not overlap.
-6. Schedule sessions between "right now" and each subject's exam date.
-   Prioritise topics whose subject has a nearer exam date; if a subject
-   has no exam date, distribute its topics gently through the whole plan.
-7. If a topic cannot fit before its exam date given the availability,
+6. Schedule sessions from "right now" to the planning horizon (${horizon}).
+   Session priority, highest first:
+   a. Topics linked to an OVERDUE task or task due within 2 days — schedule immediately.
+   b. Topics linked to a task due within 7 days — schedule soon.
+   c. Subjects with an exam date — schedule sessions before the exam, not after it.
+   d. Weak subjects (low confidence or hard difficulty) with no near deadline.
+   e. Remaining topics — distribute evenly through the horizon.
+   Exam dates are optional. If a subject has no exam date, still schedule sessions
+   for it using its tasks, difficulty, and confidence as signals.
+7. If a topic cannot fit before its deadline given the availability,
    include a warning object with subjectName, topicName, and a short
    message. Never silently drop a topic.
 8. subjectName must exactly match one of the subject names above.
