@@ -20,6 +20,8 @@ async function fetchStats() {
     profilesRes,
     ageBandRes,
     errorsRes,
+    { count: totalCourseworkItems },
+    practiceSessionsRes,
   ] = await Promise.all([
     db.from("profiles").select("*", { count: "exact", head: true }).then((r) => ({ count: r.count ?? 0 })),
     db.from("profiles").select("*", { count: "exact", head: true })
@@ -34,6 +36,8 @@ async function fetchStats() {
     db.from("profiles").select("age_band").not("age_band", "is", null),
     db.from("app_errors").select("id, created_at, error_type, message, context, user_id")
       .order("created_at", { ascending: false }).limit(15).then((r) => r),
+    db.from("coursework_items").select("*", { count: "exact", head: true }).then((r) => ({ count: r.count ?? 0 })),
+    db.from("practice_sessions").select("questions_answered, correct_count").eq("status", "completed"),
   ]);
 
   // Sessions
@@ -111,6 +115,21 @@ async function fetchStats() {
   const errors = errorsRes.data ?? [];
   const errorsUnavailable = !!errorsRes.error;
 
+  // Practice stats
+  const practiceSessions = practiceSessionsRes.data ?? [];
+  const totalQuestionsAnswered = practiceSessions.reduce(
+    (sum, s) => sum + ((s.questions_answered as number) ?? 0),
+    0,
+  );
+  const totalCorrect = practiceSessions.reduce(
+    (sum, s) => sum + ((s.correct_count as number) ?? 0),
+    0,
+  );
+  const avgPracticeAccuracy =
+    totalQuestionsAnswered > 0
+      ? Math.round((totalCorrect / totalQuestionsAnswered) * 100)
+      : null;
+
   return {
     totalUsers,
     newUsers,
@@ -133,6 +152,10 @@ async function fetchStats() {
     topHabits,
     errors,
     errorsUnavailable,
+    totalCourseworkItems: totalCourseworkItems as number,
+    totalPracticeSessions: practiceSessions.length,
+    totalQuestionsAnswered,
+    avgPracticeAccuracy,
   };
 }
 
@@ -203,6 +226,13 @@ export default async function AdminPage() {
           <KpiCard
             label="Avg confidence"
             value={stats.avgConfidence !== null ? `${stats.avgConfidence}%` : "—"}
+          />
+          <KpiCard label="Coursework items" value={stats.totalCourseworkItems} />
+          <KpiCard label="Practice sessions" value={stats.totalPracticeSessions} />
+          <KpiCard label="Questions answered" value={stats.totalQuestionsAnswered} />
+          <KpiCard
+            label="Avg practice accuracy"
+            value={stats.avgPracticeAccuracy !== null ? `${stats.avgPracticeAccuracy}%` : "—"}
           />
         </div>
       </section>

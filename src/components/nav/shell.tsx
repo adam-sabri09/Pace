@@ -20,8 +20,9 @@ const ITEMS: Item[] = [
   { href: "/today", label: "Today", icon: "calendar_today" },
   { href: "/plan", label: "Plan", icon: "event_note" },
   { href: "/subjects", label: "Subjects", icon: "menu_book" },
+  { href: "/coursework", label: "Coursework", icon: "description" },
+  { href: "/analytics", label: "Analytics", icon: "insights" },
   { href: "/coach", label: "Coach", icon: "chat" },
-  { href: "/upload-schedule", label: "Upload", icon: "upload" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];
 

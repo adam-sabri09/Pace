@@ -8,6 +8,8 @@ export type AppErrorType =
   | "plan_generation"
   | "replan"
   | "onboarding"
+  | "coursework_upload"
+  | "practice_evaluation"
   | "other";
 
 /**

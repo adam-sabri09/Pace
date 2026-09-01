@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -51,7 +52,7 @@ export default async function TodayPage() {
   // remain scheduled from past days, this returns immediately with count 0.
   await detectAndMarkMissedAction(dayStartUTC);
 
-  const [examRes, sessionsRes, subjectsRes, tasksRes, masteryRes] = await Promise.all([
+  const [examRes, sessionsRes, subjectsRes, tasksRes, masteryRes, courseworkReadyRes] = await Promise.all([
     supabase
       .from("subjects")
       .select("name, exam_date")
@@ -84,6 +85,13 @@ export default async function TodayPage() {
       .from("topic_mastery")
       .select("topic_id, mastery_pct")
       .eq("user_id", user.id),
+    supabase
+      .from("coursework_items")
+      .select("id, title, subject_name")
+      .eq("user_id", user.id)
+      .eq("status", "ready")
+      .order("created_at", { ascending: false })
+      .limit(1),
   ]);
 
   const nextExam = examRes.data?.[0] ?? null;
@@ -317,6 +325,11 @@ export default async function TodayPage() {
   }
   void mlSource; // consumed by JSX below for a subtle "Personalised by ML" label
 
+  // Practice recommendation: show when there's ready coursework AND at least one weak topic.
+  const hasWeakTopic = (masteryRes.data ?? []).some((m) => (m.mastery_pct as number) < 50);
+  const topReadyCoursework = (courseworkReadyRes.data ?? [])[0] ?? null;
+  const showPracticeCard = topReadyCoursework !== null && hasWeakTopic;
+
   type TaskRow = {
     id: string;
     task_type: string;
@@ -415,6 +428,28 @@ export default async function TodayPage() {
               {recommendationPresentation.note}
             </p>
           )}
+        </section>
+      )}
+
+      {showPracticeCard && topReadyCoursework && (
+        <section className="border border-primary/30 bg-primary/5 rounded-xl p-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-label-sm text-label-sm text-primary uppercase tracking-wider mb-1">
+              Practice from your notes
+            </p>
+            <p className="font-headline-md text-headline-md text-on-surface">
+              {(topReadyCoursework.subject_name as string | null) ?? topReadyCoursework.title as string}
+            </p>
+            <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+              You have topics where practice would help — use your uploaded material.
+            </p>
+          </div>
+          <Link
+            href={`/coursework/${topReadyCoursework.id as string}`}
+            className="shrink-0 bg-primary text-on-primary font-label-md text-label-md px-4 py-2 rounded-full"
+          >
+            Start
+          </Link>
         </section>
       )}
 

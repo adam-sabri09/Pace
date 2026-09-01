@@ -21,39 +21,80 @@ type CoachContext = {
   completionRate: number | null;
   topTechnique: string | null;
   upcomingTasks: Array<{ title: string; taskType: string; dueDate: string | null }>;
+  recentCoursework: Array<{ title: string; subjectName: string | null; topicCount: number }>;
+  recentPractice: { sessionsLast7Days: number; avgAccuracy: number | null } | null;
+  weakTopics: Array<{ name: string; mastery: number }>;
 };
 
 async function buildCoachContext(userId: string): Promise<CoachContext> {
   const supabase = await createClient();
 
-  const [profileRes, subjectsRes, sessionsRes, tasksRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("first_name, age_band, session_length_minutes")
-      .eq("id", userId)
-      .maybeSingle(),
-    supabase
-      .from("subjects")
-      .select("name, exam_date, confidence_pct, difficulty")
-      .eq("user_id", userId),
-    supabase
-      .from("sessions")
-      .select("status")
-      .eq("user_id", userId)
-      .in("status", ["completed", "missed"]),
-    supabase
-      .from("subject_tasks")
-      .select("title, task_type, due_date")
-      .eq("user_id", userId)
-      .eq("is_completed", false)
-      .order("due_date", { ascending: true, nullsFirst: false })
-      .limit(5),
-  ]);
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [profileRes, subjectsRes, sessionsRes, tasksRes, courseworkRes, practiceRes, masteryRes] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("first_name, age_band, session_length_minutes")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabase
+        .from("subjects")
+        .select("name, exam_date, confidence_pct, difficulty")
+        .eq("user_id", userId),
+      supabase
+        .from("sessions")
+        .select("status")
+        .eq("user_id", userId)
+        .in("status", ["completed", "missed"]),
+      supabase
+        .from("subject_tasks")
+        .select("title, task_type, due_date")
+        .eq("user_id", userId)
+        .eq("is_completed", false)
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(5),
+      supabase
+        .from("coursework_items")
+        .select("title, subject_name, extracted")
+        .eq("user_id", userId)
+        .eq("status", "ready")
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("practice_sessions")
+        .select("questions_answered, correct_count")
+        .eq("user_id", userId)
+        .eq("status", "completed")
+        .gte("completed_at", sevenDaysAgo),
+      supabase
+        .from("topic_mastery")
+        .select("mastery_pct, topic_id")
+        .eq("user_id", userId)
+        .lt("mastery_pct", 50)
+        .order("mastery_pct", { ascending: true })
+        .limit(5),
+    ]);
 
   const sessions = sessionsRes.data ?? [];
   const completedCount = sessions.filter((s) => s.status === "completed").length;
   const completionRate =
     sessions.length > 0 ? completedCount / sessions.length : null;
+
+  // Practice stats for last 7 days
+  const practiceSessions = practiceRes.data ?? [];
+  let avgAccuracy: number | null = null;
+  if (practiceSessions.length > 0) {
+    const totalQ = practiceSessions.reduce((sum, s) => sum + ((s.questions_answered as number) ?? 0), 0);
+    const totalC = practiceSessions.reduce((sum, s) => sum + ((s.correct_count as number) ?? 0), 0);
+    avgAccuracy = totalQ > 0 ? Math.round((totalC / totalQ) * 100) : null;
+  }
+
+  // Weak topic names — simplified: just use mastery_pct since we don't join topics here
+  const weakTopics = (masteryRes.data ?? []).map((m) => ({
+    name: `topic (mastery ${m.mastery_pct}%)`,
+    mastery: m.mastery_pct as number,
+  }));
 
   return {
     firstName: (profileRes.data?.first_name as string | null) ?? "there",
@@ -66,12 +107,22 @@ async function buildCoachContext(userId: string): Promise<CoachContext> {
     })),
     sessionLength: (profileRes.data?.session_length_minutes as number | null) ?? 45,
     completionRate,
-    topTechnique: null, // populated if personalization complete
+    topTechnique: null,
     upcomingTasks: (tasksRes.data ?? []).map((t) => ({
       title: (t.title as string | null) ?? "",
       taskType: t.task_type as string,
       dueDate: t.due_date as string | null,
     })).filter((t) => t.title),
+    recentCoursework: (courseworkRes.data ?? []).map((c) => ({
+      title: c.title as string,
+      subjectName: c.subject_name as string | null,
+      topicCount: ((c.extracted as { topics?: unknown[] } | null)?.topics?.length ?? 0),
+    })),
+    recentPractice:
+      practiceSessions.length > 0
+        ? { sessionsLast7Days: practiceSessions.length, avgAccuracy }
+        : null,
+    weakTopics,
   };
 }
 
@@ -98,6 +149,20 @@ function buildSystemPrompt(ctx: CoachContext, today: string): string {
       ? `${Math.round(ctx.completionRate * 100)}% of scheduled sessions completed`
       : "No session history yet";
 
+  const courseworkLines =
+    ctx.recentCoursework.length > 0
+      ? ctx.recentCoursework
+          .map(
+            (c) =>
+              `• "${c.title}"${c.subjectName ? ` (${c.subjectName})` : ""}${c.topicCount > 0 ? ` — ${c.topicCount} topics` : ""}`,
+          )
+          .join("\n")
+      : "None uploaded yet.";
+
+  const practiceText = ctx.recentPractice
+    ? `${ctx.recentPractice.sessionsLast7Days} session(s) this week${ctx.recentPractice.avgAccuracy !== null ? `, avg accuracy ${ctx.recentPractice.avgAccuracy}%` : ""}`
+    : "No practice sessions yet.";
+
   return `You are Pace Coach, a friendly and encouraging AI study coach for high-school students.
 You help students study smarter, stay motivated, and manage their workload.
 
@@ -113,15 +178,22 @@ ${subjectLines || "No subjects set yet."}
 Upcoming tasks/deadlines:
 ${taskLines}
 
+Uploaded coursework (ready for practice):
+${courseworkLines}
+
+Practice this week: ${practiceText}
+
 Guidelines:
 1. Be warm, encouraging, and concise — this is a teenager. No walls of text.
 2. Give specific, actionable study advice tied to the student's actual subjects.
 3. When asked about a subject, reference their confidence/difficulty if available.
-4. Suggest concrete study techniques (active recall, spaced repetition, practice tests, Feynman, interleaving).
-5. Never be dismissive. If they're struggling, normalise it and offer a small next step.
-6. Keep each response under 150 words unless a longer answer is truly needed.
-7. You cannot see their plan or schedule directly — if asked, tell them to check the Plan tab.
-8. You are not a therapist. If they mention serious distress, kindly suggest they talk to a trusted adult.`;
+4. If they ask about uploaded coursework or a specific topic, refer to their uploaded materials when relevant.
+5. Suggest concrete study techniques (active recall, spaced repetition, practice tests, Feynman, interleaving).
+6. If they have coursework uploaded, encourage them to use the Practice feature to test themselves.
+7. Never be dismissive. If they're struggling, normalise it and offer a small next step.
+8. Keep each response under 150 words unless a longer answer is truly needed.
+9. You cannot see their plan or schedule directly — if asked, tell them to check the Plan tab.
+10. You are not a therapist. If they mention serious distress, kindly suggest they talk to a trusted adult.`;
 }
 
 // ---------------------------------------------------------------------------
