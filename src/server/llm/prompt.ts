@@ -82,9 +82,27 @@ export function buildPrompt(input: PlanInput): string {
     older: "A-Level / Year 12-13 (16-17 year old)",
     adult: "University / 18+",
   };
+  const AGE_BAND_LABELS: Record<string, string> = {
+    junior: "Year 9-11 / GCSE (13-15)",
+    intermediate: "Year 12-13 / A-Level (16-17)",
+    senior: "Final year / Pre-university (17-18)",
+    university: "University / Higher education",
+    adult: "Adult learner",
+  };
   const profileBlock = input.profile
     ? (() => {
-        const { ageGroup, topTechnique, subjectIntelligence } = input.profile;
+        const {
+          ageGroup, ageBand, topTechnique,
+          studyHabits, studyChallenges, goalRanking, memoryScore,
+          subjectIntelligence,
+        } = input.profile;
+
+        const ageLabel = ageBand
+          ? (AGE_BAND_LABELS[ageBand] ?? ageBand)
+          : ageGroup
+          ? (AGE_LABELS[ageGroup] ?? ageGroup)
+          : null;
+
         const subjectNotes =
           subjectIntelligence && subjectIntelligence.length > 0
             ? subjectIntelligence
@@ -98,16 +116,24 @@ export function buildPrompt(input: PlanInput): string {
                 })
                 .join("\n")
             : "";
-        return (
-          "\nStudent profile (use to personalise session instructions):\n" +
-          `  - Age group: ${AGE_LABELS[ageGroup] ?? ageGroup}\n` +
-          `  - Preferred study technique: ${topTechnique.replace(/_/g, " ")}\n` +
-          (subjectNotes
-            ? `  - Subject difficulty/confidence:\n${subjectNotes}\n`
-            : "") +
-          `  When writing the "instruction" field, prefer wording that matches the preferred technique.\n` +
-          `  For harder subjects with lower confidence, bias toward more frequent topic coverage.\n`
-        );
+
+        let block = "\nStudent profile (use to personalise session instructions):\n";
+        if (ageLabel) block += `  - Age group: ${ageLabel}\n`;
+        if (topTechnique) block += `  - Preferred study technique: ${topTechnique.replace(/_/g, " ")}\n`;
+        if (studyHabits && studyHabits.length > 0)
+          block += `  - Study habits: ${studyHabits.map((h) => h.replace(/_/g, " ")).join(", ")}\n`;
+        if (studyChallenges && studyChallenges.length > 0)
+          block += `  - Biggest challenges: ${studyChallenges.map((c) => c.replace(/_/g, " ")).join(", ")}\n`;
+        if (goalRanking && goalRanking.length > 0)
+          block += `  - Goals (top 3): ${goalRanking.slice(0, 3).map((g) => g.replace(/_/g, " ")).join(" > ")}\n`;
+        if (memoryScore != null) {
+          const memLabel = memoryScore >= 80 ? "strong" : memoryScore >= 50 ? "average" : "developing";
+          block += `  - Memory/retention: ${memLabel} (score ${memoryScore}%)\n`;
+        }
+        if (subjectNotes) block += `  - Subject difficulty/confidence:\n${subjectNotes}\n`;
+        block += `  When writing the "instruction" field, prefer wording that matches the preferred technique.\n`;
+        block += `  For harder subjects with lower confidence, bias toward more frequent topic coverage.\n`;
+        return block;
       })()
     : "";
 

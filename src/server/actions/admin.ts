@@ -10,6 +10,10 @@ export async function clearAppErrorsAction(): Promise<{ ok: boolean; error?: str
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // Temporary: any authenticated user may clear errors.
+  // To restrict, add an email-allowlist check here, e.g.:
+  //   const ADMINS = (process.env.ADMIN_EMAILS ?? "").split(",");
+  //   if (!ADMINS.includes(user?.email ?? "")) return { ok: false, error: "Not authorised." };
   if (!user) return { ok: false, error: "Not authenticated." };
 
   const db = createServiceClient();

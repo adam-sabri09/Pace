@@ -15,6 +15,7 @@ import {
   questionTypeInstruction,
   type Difficulty,
 } from "@/lib/practice/difficulty";
+import { resolveTopicId } from "@/lib/practice/topic-resolution";
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -116,6 +117,19 @@ export async function startPracticeAction(
     return { ok: false, error: "Could not generate a question. Try again." };
   }
 
+  // Resolve topic_id so mastery updates work. Non-fatal — stays null if no match.
+  const { data: subjectsData } = await supabase
+    .from("subjects")
+    .select("name, topics(id)")
+    .eq("user_id", user.id);
+  const resolvedTopicId = resolveTopicId(
+    item.subject_name as string | null,
+    (subjectsData ?? []).map((s) => ({
+      name: s.name as string,
+      topics: (s.topics as Array<{ id: string }> | null) ?? [],
+    })),
+  );
+
   const { data: session, error: sessErr } = await supabase
     .from("practice_sessions")
     .insert({
@@ -123,6 +137,7 @@ export async function startPracticeAction(
       coursework_item_id: courseworkItemId,
       subject_name: item.subject_name as string | null,
       topic_name: (extracted.topics?.[0]?.name) ?? null,
+      topic_id: resolvedTopicId,
       status: "active",
       current_difficulty: initialDifficulty,
       current_question: firstQuestion,
@@ -315,7 +330,8 @@ export async function submitAnswerAction(
       current_difficulty: nextDifficulty,
       current_question: nextStoredQuestion ?? null,
     })
-    .eq("id", sessionId);
+    .eq("id", sessionId)
+    .eq("user_id", user.id);
 
   return {
     ok: true,
