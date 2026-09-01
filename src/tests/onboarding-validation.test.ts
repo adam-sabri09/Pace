@@ -168,15 +168,12 @@ describe("OnboardingSchema", () => {
     expect(parsed.success).toBe(false);
   });
 
-  it("rejects when no subject has an exam date", () => {
+  it("accepts when no subject has an exam date (exam dates are now optional)", () => {
     const parsed = OnboardingSchema.safeParse({
       ...baseOnboarding,
       subjects: [{ ...baseSubject, examDate: null }],
     });
-    expect(parsed.success).toBe(false);
-    if (!parsed.success) {
-      expect(parsed.error.issues[0].message).toMatch(/exam/i);
-    }
+    expect(parsed.success).toBe(true);
   });
 
   it("rejects when availability is empty", () => {

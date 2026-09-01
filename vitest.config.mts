@@ -14,6 +14,8 @@ export default defineConfig({
         resolve: {
           alias: {
             "@": fileURLToPath(new URL("./src", import.meta.url)),
+            // server-only throws outside Next.js server context; stub it for unit tests.
+            "server-only": fileURLToPath(new URL("./src/tests/__mocks__/server-only.ts", import.meta.url)),
           },
         },
       },
@@ -27,6 +29,9 @@ export default defineConfig({
         resolve: {
           alias: {
             "@": fileURLToPath(new URL("./src", import.meta.url)),
+            // server-only is a Next.js guard that throws in non-server contexts.
+            // In jsdom tests we stub it out so component tests can import server modules.
+            "server-only": fileURLToPath(new URL("./src/tests/__mocks__/server-only.ts", import.meta.url)),
           },
         },
       },

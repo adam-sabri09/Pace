@@ -6,11 +6,12 @@ import { generateObject } from "ai";
 import { PlanOutputSchema, type PlanInput, type PlanOutput } from "./schema";
 import { buildPrompt } from "./prompt";
 import {
-  latestExamDateOf,
   sanitizeWarnings,
   validatePlanOutput,
   type ValidatedSession,
 } from "./validate";
+import { generateFallbackPlan } from "./fallback";
+import { utcToLocalParts } from "./time";
 
 /**
  * Call Gemini to generate a plan, then server-validate. If the LLM output
@@ -28,13 +29,10 @@ import {
 // quality; single-line swap if a future deprecation moves us again.
 const MODEL_ID = "gemini-3.6-flash";
 
-// Surfaced when the model returns a valid but EMPTY plan — i.e. the
-// constraints leave no room for any session before the exam (e.g. all
-// availability falls after the exam date). The feasibility pre-check in
-// validate.ts catches the common cases earlier with more specific text; this
-// is the backstop for residual infeasible inputs.
+// Surfaced when the model returns a valid but EMPTY plan. The feasibility
+// pre-check in validate.ts catches the common cases; this is the backstop.
 const NO_FEASIBLE_SESSIONS =
-  "We couldn't fit any study sessions before your exam date. Add more available time, or move your exam date further out.";
+  "We couldn't fit any study sessions in your available time. Try adding more availability or choosing a shorter session length.";
 
 export type GenerateResult =
   | {
@@ -47,7 +45,14 @@ export type GenerateResult =
 export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
   const model = google(MODEL_ID);
   const basePrompt = buildPrompt(input);
-  const latestExam = latestExamDateOf(input);
+  // Only use future exam dates — a past exam must not constrain future sessions.
+  const todayDateStr = utcToLocalParts(input.now, input.timeZone).dateString;
+  const latestExam =
+    input.subjects
+      .map((s) => s.examDate)
+      .filter((d): d is string => d != null && d > todayDateStr)
+      .sort()
+      .pop() ?? null;
 
   const attempt = async (prompt: string): Promise<GenerateResult> => {
     let raw: PlanOutput;
@@ -87,15 +92,28 @@ export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
   const second = await attempt(basePrompt + addendum);
   if (second.ok) return second;
 
-  // Surface the real reason rather than an opaque generic. If the model kept
-  // returning an empty plan, that specific message is the most useful; any
-  // other residual validation failure gets an actionable fallback.
+  // Both LLM attempts failed. Fall back to the deterministic planner rather
+  // than surfacing an error — the feasibility pre-check already confirmed at
+  // least one slot fits, so the fallback always produces ≥ 1 session.
+  // Common failure modes the fallback avoids: subject/topic name casing
+  // divergence, window-boundary arithmetic errors, and minor time drift.
+  const fallbackSessions = generateFallbackPlan(input);
+  if (fallbackSessions.length > 0) {
+    return {
+      ok: true,
+      sessions: fallbackSessions,
+      // Carry over any warnings from the last failed LLM attempt if it returned some
+      warnings: [],
+    };
+  }
+
+  // Only reach here if feasibility somehow lied (should not happen in practice).
   if (second.error === NO_FEASIBLE_SESSIONS || first.error === NO_FEASIBLE_SESSIONS) {
     return { ok: false, error: NO_FEASIBLE_SESSIONS };
   }
   return {
     ok: false,
     error:
-      "We couldn't build a plan that fits your available time. Try adding more availability, reducing topics, or moving your exam date.",
+      "We couldn't build a plan that fits your available time. Try adding more availability or choosing a shorter session length.",
   };
 }

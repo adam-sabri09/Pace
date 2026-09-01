@@ -8,6 +8,10 @@ vi.mock("@/server/actions/sessions", () => ({
   markMissedAction: (id: string) => markMissed(id),
 }));
 
+vi.mock("@/server/actions/events", () => ({
+  recordSessionEventAction: vi.fn(),
+}));
+
 // Mock next/navigation — StudySession uses useRouter().push.
 const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({

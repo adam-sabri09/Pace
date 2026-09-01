@@ -75,9 +75,22 @@ export type PlanInput = {
     startsAt: string; // ISO
     durationMinutes: number;
   }>;
+  /** Upcoming homework / assignments / quizzes / exams from subject_tasks. */
+  tasks?: Array<{
+    title: string;
+    taskType: string; // homework | assignment | project | quiz | exam | other
+    subjectName: string;
+    dueDate: string | null; // YYYY-MM-DD
+    priority: "low" | "medium" | "high";
+  }>;
   profile?: {
-    ageGroup: "younger" | "older" | "adult";
-    topTechnique: string; // TechniqueKey
+    ageGroup?: "younger" | "older" | "adult"; // from old questionnaire
+    ageBand?: string; // from new onboarding wizard (junior|intermediate|senior|university|adult)
+    topTechnique?: string; // TechniqueKey or first study habit
+    studyHabits?: string[];
+    studyChallenges?: string[];
+    goalRanking?: string[];
+    memoryScore?: number; // 0-100
     subjectIntelligence?: Array<{
       subjectName: string;
       difficulty?: "easy" | "medium" | "hard";

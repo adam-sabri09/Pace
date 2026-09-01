@@ -16,6 +16,7 @@ import {
 } from "@/server/llm/diff";
 import { scorePersonalization } from "@/lib/personalization/scoring";
 import type { PersonalizationAnswers } from "@/lib/personalization/types";
+import { logAppError } from "@/lib/errors/log-error";
 
 /**
  * Plan generation + adaptive re-planning.
@@ -85,10 +86,12 @@ async function buildPlanInput(
   sessionLengthMinutes: 25 | 45 | 60,
   includeCompleted: boolean,
 ): Promise<{ ok: true; input: PlanInput; timeZone: string } | { ok: false; error: string }> {
-  const [profileRes, subjectsRes, availRes] = await Promise.all([
+  const [profileRes, subjectsRes, availRes, tasksRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("time_zone, age_group, personalization_answers, personalization_completed_at")
+      .select(
+        "time_zone, age_group, personalization_answers, personalization_completed_at, age_band, study_habits, study_challenges, goal_ranking, memory_score",
+      )
       .eq("id", userId)
       .maybeSingle(),
     supabase
@@ -99,6 +102,11 @@ async function buildPlanInput(
       .from("availability_windows")
       .select("day_of_week, starts_at, ends_at")
       .eq("user_id", userId),
+    supabase
+      .from("subject_tasks")
+      .select("task_type, title, due_date, priority, subject:subjects(name)")
+      .eq("user_id", userId)
+      .eq("is_completed", false),
   ]);
   if (profileRes.error || !profileRes.data) {
     return { ok: false, error: "Could not read profile for plan generation." };
@@ -130,31 +138,83 @@ async function buildPlanInput(
     });
   }
 
-  // Build optional personalization profile block.
+  // Build personalization profile from any available data (old questionnaire
+  // or new wizard fields). Both paths are additive; old questionnaire's
+  // topTechnique takes priority over deriving it from study_habits.
   const profileData = profileRes.data;
   let planProfile: PlanInput["profile"] = undefined;
-  if (
-    profileData?.personalization_completed_at &&
-    profileData?.personalization_answers
-  ) {
+
+  const ageBand = profileData?.age_band as string | null;
+  const studyHabits = profileData?.study_habits as string[] | null;
+  const studyChallenges = profileData?.study_challenges as string[] | null;
+  const goalRanking = profileData?.goal_ranking as string[] | null;
+  const memoryScore = profileData?.memory_score as number | null;
+
+  const subjectIntelligence = subjectsRes.data
+    .filter((s) => s.difficulty || s.confidence_pct != null)
+    .map((s) => ({
+      subjectName: s.name as string,
+      difficulty: (s.difficulty as "easy" | "medium" | "hard" | null) ?? undefined,
+      confidencePct: (s.confidence_pct as number | null) ?? undefined,
+    }));
+
+  let topTechnique: string | undefined;
+  let ageGroup: "younger" | "older" | "adult" | undefined;
+  if (profileData?.personalization_completed_at && profileData?.personalization_answers) {
     try {
       const answers = profileData.personalization_answers as PersonalizationAnswers;
       const scoring = scorePersonalization(answers);
-      planProfile = {
-        ageGroup: profileData.age_group as "younger" | "older" | "adult",
-        topTechnique: scoring.topTechnique,
-        subjectIntelligence: subjectsRes.data
-          .filter((s) => s.difficulty || s.confidence_pct != null)
-          .map((s) => ({
-            subjectName: s.name as string,
-            difficulty: (s.difficulty as "easy" | "medium" | "hard" | null) ?? undefined,
-            confidencePct: (s.confidence_pct as number | null) ?? undefined,
-          })),
-      };
+      topTechnique = scoring.topTechnique;
+      ageGroup = profileData.age_group as "younger" | "older" | "adult";
     } catch {
-      // Scoring failure is non-fatal — proceed without personalization context.
+      // Non-fatal — proceed without old questionnaire context.
     }
   }
+  if (!topTechnique && studyHabits?.[0]) topTechnique = studyHabits[0];
+
+  const hasPersonalizationData =
+    ageBand != null ||
+    (studyHabits && studyHabits.length > 0) ||
+    topTechnique != null ||
+    subjectIntelligence.length > 0;
+
+  if (hasPersonalizationData) {
+    const p: NonNullable<PlanInput["profile"]> = {};
+    if (ageGroup) p.ageGroup = ageGroup;
+    if (ageBand) p.ageBand = ageBand;
+    if (topTechnique) p.topTechnique = topTechnique;
+    if (studyHabits?.length) p.studyHabits = studyHabits;
+    if (studyChallenges?.length) p.studyChallenges = studyChallenges;
+    if (goalRanking?.length) p.goalRanking = goalRanking;
+    if (memoryScore != null) p.memoryScore = memoryScore;
+    if (subjectIntelligence.length > 0) p.subjectIntelligence = subjectIntelligence;
+    planProfile = p;
+  }
+
+  // Map subject_tasks rows to PlanInput["tasks"] — tasksRes failure is non-fatal.
+  type TaskRow = {
+    task_type: string;
+    title: string | null;
+    due_date: string | null;
+    priority: string;
+    subject: { name: string } | { name: string }[] | null;
+  };
+  const tasks: PlanInput["tasks"] =
+    tasksRes.data && tasksRes.data.length > 0
+      ? (tasksRes.data as TaskRow[])
+          .filter((t) => t.title)
+          .map((t) => {
+            const subj = Array.isArray(t.subject) ? t.subject[0] : t.subject;
+            return {
+              title: t.title as string,
+              taskType: t.task_type,
+              subjectName: subj?.name ?? "",
+              dueDate: t.due_date ?? null,
+              priority: (t.priority as "low" | "medium" | "high") ?? "medium",
+            };
+          })
+          .filter((t) => t.subjectName)
+      : undefined;
 
   const input: PlanInput = {
     timeZone,
@@ -174,6 +234,7 @@ async function buildPlanInput(
       endsAt: (w.ends_at as string).slice(0, 5),
     })),
     completedSessions,
+    tasks,
     profile: planProfile,
   };
 
@@ -212,6 +273,18 @@ export async function generatePlanForUser(
     .select("id")
     .single();
   if (planErr || !planRow) {
+    await logAppError(
+      "plan_generation",
+      planErr?.message ?? "plans insert returned no data",
+      {
+        step: "insert_plan",
+        code: planErr?.code,
+        details: planErr?.details,
+        hint: planErr?.hint,
+        userId,
+      },
+      userId,
+    );
     return { ok: false, error: "Could not save the generated plan." };
   }
   const planId = planRow.id as string;

@@ -1,4 +1,10 @@
 import type {
+  AgeGroup,
+  FocusBand,
+  StudyHabit,
+  StudyChallenge,
+  StudyGoal,
+  MemoryRating,
   PersonalizationAnswers,
   ScoringResult,
   TechniqueKey,
@@ -138,6 +144,79 @@ const ALL_TECHNIQUES: TechniqueKey[] = [
   'active_recall', 'spaced_repetition', 'practice_testing',
   'pomodoro', 'deep_work', 'feynman', 'interleaving',
 ];
+
+/**
+ * Map new onboarding profile fields → legacy PersonalizationAnswers format
+ * so we can reuse the existing weight matrix without duplicating it.
+ */
+export function scoreFromNewProfile(profile: {
+  ageBand: string | null;
+  studyHabits: string[];
+  biggestChallenge: string | null;
+  studyChallenges?: string[];
+  goalRanking: string[];
+  memoryScore: number | null;
+  sessionLengthMinutes: number | null;
+}): ScoringResult {
+  const ageGroup: AgeGroup =
+    profile.ageBand === 'junior' || profile.ageBand === 'intermediate'
+      ? 'younger'
+      : profile.ageBand === 'adult'
+        ? 'adult'
+        : 'older';
+
+  const minutes = profile.sessionLengthMinutes ?? 45;
+  const focusBand: FocusBand =
+    minutes <= 25 ? 'short' : minutes <= 45 ? 'medium' : 'long';
+
+  const HABIT_MAP: Record<string, StudyHabit> = {
+    flashcards: 'flashcards',
+    practice_questions: 'active',
+    notes: 'note_taking',
+    reading: 'passive',
+    videos: 'passive_media',
+    group_study: 'active',
+  };
+  let studyHabit: StudyHabit = 'active';
+  for (const h of profile.studyHabits) {
+    if (h in HABIT_MAP) { studyHabit = HABIT_MAP[h]; break; }
+  }
+
+  const CHALLENGE_MAP: Record<string, StudyChallenge> = {
+    focus: 'focus', memory: 'memory', understanding: 'understanding',
+    time: 'prioritization', procrastination: 'prioritization',
+    knowing_what: 'prioritization', motivation: 'prioritization',
+    // New multi-select challenge keys
+    starting: 'prioritization', homework: 'prioritization', exams: 'memory', other: 'focus',
+  };
+  // Prefer the new multi-select array; fall back to the legacy single value.
+  const challenges: string[] =
+    (profile.studyChallenges && profile.studyChallenges.length > 0)
+      ? profile.studyChallenges
+      : profile.biggestChallenge ? [profile.biggestChallenge] : [];
+  // Aggregate: pick the most impactful challenge (first recognised value).
+  const studyChallenge: StudyChallenge =
+    challenges.map((c) => CHALLENGE_MAP[c]).find((v): v is StudyChallenge => v !== undefined) ?? 'focus';
+
+  const GOAL_MAP: Record<string, StudyGoal> = {
+    'Improve my grades': 'excel',
+    'Pass my exams': 'pass',
+    'Improve my focus': 'habits',
+    'Build better study habits': 'habits',
+    'Manage my time better': 'habits',
+    'Get help from an AI coach': 'mastery',
+  };
+  const studyGoal: StudyGoal = GOAL_MAP[profile.goalRanking[0] ?? ''] ?? 'pass';
+
+  const ms = profile.memoryScore;
+  const memoryRating: MemoryRating =
+    ms == null ? 'average' :
+    ms >= 80 ? 'strong' :
+    ms >= 60 ? 'average' :
+    ms >= 40 ? 'weak' : 'very_weak';
+
+  return scorePersonalization({ ageGroup, focusBand, studyHabit, studyChallenge, studyGoal, memoryRating });
+}
 
 export function scorePersonalization(answers: PersonalizationAnswers): ScoringResult {
   const rawPoints: Record<TechniqueKey, number> = {} as Record<TechniqueKey, number>;

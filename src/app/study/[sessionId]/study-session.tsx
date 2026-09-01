@@ -8,6 +8,7 @@ import {
   markDoneAction,
   markMissedAction,
 } from "@/server/actions/sessions";
+import { recordSessionEventAction } from "@/server/actions/events";
 import type { PlanChange, PlanWarning } from "@/server/llm/diff";
 
 // ---------------------------------------------------------------------------
@@ -83,6 +84,10 @@ export function StudySession({
   // startedAtRef holds Date.now() for the current running interval.
   // A ref avoids adding it to effect dependencies (would restart the interval).
   const startedAtRef = useRef<number | null>(null);
+
+  // Focus-loss tracking via the Page Visibility API.
+  // Counts how many times the tab was hidden while the session was running.
+  const focusLossCountRef = useRef(0);
 
   const [missedResult, setMissedResult] = useState<{
     changes: PlanChange[];
@@ -169,14 +174,28 @@ export function StudySession({
     return () => clearTimeout(t);
   }, [phase, router]);
 
+  // Visibility API: count tab-hide events while the session is running.
+  // We read focusLossCountRef (not state) so the handler never re-registers.
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === "hidden") {
+        focusLossCountRef.current += 1;
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, []); // intentionally runs once — reads mutable ref, not state
+
   // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------
 
   const handleStart = useCallback(() => {
     startedAtRef.current = Date.now();
+    focusLossCountRef.current = 0;
     setTimer({ phase: "running", elapsed: 0, pausedElapsed: 0 });
-  }, []);
+    void recordSessionEventAction(sessionId, "started", {});
+  }, [sessionId]);
 
   const handlePause = useCallback(() => {
     const acc =
@@ -194,7 +213,14 @@ export function StudySession({
 
   const handleDone = useCallback(async () => {
     setTimer((t) => ({ ...t, phase: "completing" }));
-    const result = await markDoneAction(sessionId);
+    const currentElapsed = startedAtRef.current !== null
+      ? pausedElapsed + (Date.now() - startedAtRef.current) / 1000
+      : pausedElapsed;
+    const result = await markDoneAction(
+      sessionId,
+      focusLossCountRef.current,
+      Math.round(currentElapsed),
+    );
     if (result.ok) {
       try { sessionStorage.removeItem(storageKey(sessionId)); } catch { /* ignore */ }
       setTimer((t) => ({ ...t, phase: "completed" }));
@@ -202,11 +228,14 @@ export function StudySession({
       setErrorMessage(result.error);
       setTimer((t) => ({ ...t, phase: "error" }));
     }
-  }, [sessionId]);
+  }, [sessionId, pausedElapsed]);
 
   const handleMissed = useCallback(async () => {
     setTimer((t) => ({ ...t, phase: "missing" }));
-    const result = await markMissedAction(sessionId);
+    const currentElapsed = startedAtRef.current !== null
+      ? pausedElapsed + (Date.now() - startedAtRef.current) / 1000
+      : pausedElapsed;
+    const result = await markMissedAction(sessionId, Math.round(currentElapsed));
     if (result.ok) {
       try { sessionStorage.removeItem(storageKey(sessionId)); } catch { /* ignore */ }
       setMissedResult({ changes: result.changes, warnings: result.warnings });
@@ -215,7 +244,7 @@ export function StudySession({
       setErrorMessage(result.error);
       setTimer((t) => ({ ...t, phase: "error" }));
     }
-  }, [sessionId]);
+  }, [sessionId, pausedElapsed]);
 
   // ---------------------------------------------------------------------------
   // Render

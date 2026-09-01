@@ -111,7 +111,7 @@ export function UploadForm() {
         <input
           ref={fileRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+          accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain"
           className="sr-only"
           id="schedule-file"
           onChange={handleFileChange}
