@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { LocalTime } from "@/components/LocalTime";
+import { ClearErrorsButton } from "@/components/admin/ClearErrorsButton";
 
 // Temporarily: all authenticated users can access /admin.
 
@@ -394,9 +395,12 @@ export default async function AdminPage() {
 
       {/* Recent errors */}
       <section className="border border-outline-variant rounded-xl p-6 bg-surface">
-        <h2 className="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-stack-sm">
-          Recent errors
-        </h2>
+        <div className="flex items-center justify-between gap-4 mb-stack-sm">
+          <h2 className="font-label-sm text-label-sm text-outline uppercase tracking-wider">
+            Recent errors
+          </h2>
+          {!stats.errorsUnavailable && stats.errors.length > 0 && <ClearErrorsButton />}
+        </div>
         {stats.errorsUnavailable ? (
           <div className="border border-outline-variant rounded-lg p-4 bg-surface-container-low">
             <p className="font-body-md text-body-md text-on-surface-variant">
