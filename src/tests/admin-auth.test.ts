@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 
 // We test the helper by controlling process.env directly.
 // The module is not "use server" so it can be imported in a test context.
