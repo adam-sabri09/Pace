@@ -3,8 +3,6 @@ import { redirect } from "next/navigation";
 import { BottomNav, SideNav, TopAppBar } from "@/components/nav/shell";
 import { createClient } from "@/lib/supabase/server";
 
-const ADMIN_EMAILS = ["adam.sabri@mal.ai"];
-
 /**
  * Authenticated shell applied to /today, /plan, /subjects, /settings, /admin.
  * The onboarding route stays outside this group (focus screen, no nav).
@@ -21,7 +19,8 @@ export default async function AppShellLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const isAdmin = ADMIN_EMAILS.map((e) => e.toLowerCase()).includes((user.email ?? "").toLowerCase());
+  // Temporarily: all authenticated users have admin access.
+  const isAdmin = true;
 
   return (
     <div className="min-h-full flex flex-col md:flex-row bg-background text-on-surface">

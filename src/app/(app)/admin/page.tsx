@@ -3,9 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-// Only this email address can access /admin.
-// TODO: replace with a database role flag when the user base grows.
-const ADMIN_EMAILS = ["adam.sabri@mal.ai"];
+// Temporarily: all authenticated users can access /admin.
 
 type StatRow = { count: string } | null;
 
@@ -144,24 +142,11 @@ export default async function AdminPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Resolve email: top-level first, then user_metadata fallback (some OAuth providers
-  // populate user_metadata.email but not user.email directly).
-  const rawEmail =
-    user?.email ??
-    (user?.user_metadata?.email as string | undefined) ??
-    "";
-  const userEmail = rawEmail.toLowerCase();
-  const adminList = ADMIN_EMAILS.map((e) => e.toLowerCase());
-  const isAdmin = adminList.includes(userEmail);
-
-  if (!user || !isAdmin) {
-    console.error(
-      `[admin] access denied — id=${user?.id ?? "none"} email="${userEmail}" adminList=${JSON.stringify(adminList)}`,
-    );
+  // Temporarily: all authenticated users can access /admin.
+  // The layout already verified the user is logged in; if somehow null, redirect.
+  if (!user) {
     redirect("/today");
   }
-
-  console.log(`[admin] access granted — email="${userEmail}"`);
 
   const stats = await fetchStats();
 
@@ -191,7 +176,7 @@ export default async function AdminPage() {
         </p>
         <h1 className="font-display text-display text-primary">Admin</h1>
         <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-          Live data from Supabase. Visible only to {ADMIN_EMAILS.join(", ")}.
+          Live data from Supabase.
         </p>
       </div>
 
