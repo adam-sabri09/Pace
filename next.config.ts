@@ -12,6 +12,9 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // output: 'standalone' creates .next/standalone — the minimal bundle used by the Dockerfile.
+  // `npm run dev` and `npm run start` are unaffected.
+  output: "standalone",
   async headers() {
     return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },
