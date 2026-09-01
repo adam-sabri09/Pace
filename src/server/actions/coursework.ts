@@ -152,7 +152,8 @@ export async function uploadCourseworkAction(
     await supabase
       .from("coursework_items")
       .update({ title: object.title, subject_name: object.subjectName, status: "ready", extracted: object })
-      .eq("id", itemId);
+      .eq("id", itemId)
+      .eq("user_id", user.id);
 
     return {
       ok: true,
@@ -173,7 +174,8 @@ export async function uploadCourseworkAction(
     await supabase
       .from("coursework_items")
       .update({ status: "failed", error_message: "Could not extract content from this file." })
-      .eq("id", itemId);
+      .eq("id", itemId)
+      .eq("user_id", user.id);
 
     const lower = msg.toLowerCase();
     if (lower.includes("api key") || lower.includes("unauthorized")) {

@@ -43,15 +43,18 @@ export async function savePersonalizationAction(
   redirect("/today");
 }
 
-export async function skipPersonalizationAction(): Promise<void> {
+export async function skipPersonalizationAction(): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return { ok: false, error: "Not authenticated." };
 
-  await supabase
+  const { error } = await supabase
     .from("profiles")
     .update({ personalization_skipped: true })
     .eq("id", user.id);
+
+  if (error) return { ok: false, error: "Could not save preference." };
+  return { ok: true };
 }

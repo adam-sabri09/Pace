@@ -295,7 +295,8 @@ export async function submitAnswerAction(
         current_difficulty: nextDifficulty,
         current_question: null,
       })
-      .eq("id", sessionId);
+      .eq("id", sessionId)
+      .eq("user_id", user.id);
 
     return { ok: true, isCorrect, feedback, nextQuestion: null, sessionComplete: true };
   }

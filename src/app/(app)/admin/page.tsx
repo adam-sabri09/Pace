@@ -4,8 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { LocalTime } from "@/components/LocalTime";
 import { ClearErrorsButton } from "@/components/admin/ClearErrorsButton";
-
-// Temporarily: all authenticated users can access /admin.
+import { isAdminEmail } from "@/lib/auth/admin";
 
 async function fetchStats() {
   const db = createServiceClient();
@@ -165,13 +164,18 @@ export default async function AdminPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Temporarily: all authenticated users can access /admin.
-  // The layout already verified the user is logged in; if somehow null, redirect.
-  if (!user) {
+  if (!user || !isAdminEmail(user.email)) {
     redirect("/today");
   }
 
-  const stats = await fetchStats();
+  let stats: Awaited<ReturnType<typeof fetchStats>> | null = null;
+  let statsError: string | null = null;
+  try {
+    stats = await fetchStats();
+  } catch (e) {
+    statsError = e instanceof Error ? e.message : "Failed to load stats.";
+    console.error("[admin] fetchStats failed:", statsError);
+  }
 
   const AGE_LABELS: Record<string, string> = {
     junior: "Junior",
@@ -189,6 +193,26 @@ export default async function AdminPage() {
     onboarding: "Onboarding",
     other: "Other",
   };
+
+  if (!stats) {
+    return (
+      <div className="max-w-5xl mx-auto px-container-margin py-stack-lg space-y-stack-lg">
+        <div>
+          <p className="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-1">Internal</p>
+          <h1 className="font-display text-display text-primary">Admin</h1>
+        </div>
+        <div className="border border-error rounded-xl p-6 bg-error-container">
+          <p className="font-label-md text-label-md text-on-error-container mb-1">Dashboard unavailable</p>
+          <p className="font-body-md text-body-md text-on-error-container">
+            {statsError ?? "Could not load admin stats."}
+          </p>
+          <p className="font-body-sm text-body-sm text-on-error-container mt-2 opacity-70">
+            Check that NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in the environment.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-container-margin py-stack-lg space-y-stack-lg">

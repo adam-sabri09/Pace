@@ -22,6 +22,15 @@ export async function recordSessionEventAction(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
 
+  // Verify the session belongs to this user before inserting the event.
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("id")
+    .eq("id", sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!session) return { ok: false, error: "Session not found." };
+
   const { error } = await supabase.from("session_events").insert({
     user_id: user.id,
     study_session_id: sessionId,
@@ -33,24 +42,3 @@ export async function recordSessionEventAction(
   return { ok: true };
 }
 
-/**
- * Write a free-form analytics event.
- * Used for onboarding completion, upload success, etc.
- */
-export async function recordAnalyticsEventAction(
-  eventType: string,
-  metadata: Record<string, unknown> = {},
-): Promise<RecordEventResult> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not authenticated." };
-
-  const { error } = await supabase.from("analytics_events").insert({
-    user_id: user.id,
-    event_type: eventType,
-    metadata,
-  });
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
-}

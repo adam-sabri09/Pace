@@ -11,6 +11,11 @@ export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
+    // Log which variable is missing to help diagnose production incidents.
+    console.error("[createServiceClient] missing env vars:", {
+      hasUrl: !!url,
+      hasKey: !!key,
+    });
     throw new Error(
       "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.",
     );
