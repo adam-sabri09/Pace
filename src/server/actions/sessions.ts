@@ -72,8 +72,9 @@ export async function detectAndMarkMissedAction(
 
   if (updErr) return { ok: false, error: "Could not mark missed sessions." };
 
-  revalidatePath("/today");
-  revalidatePath("/plan");
+  // No revalidatePath here: this function is called during the /today render,
+  // where revalidatePath is forbidden. The page reads fresh session data in
+  // the Promise.all that follows, so no revalidation is needed.
   return { ok: true, count: ids.length };
 }
 
