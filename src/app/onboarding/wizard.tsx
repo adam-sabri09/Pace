@@ -13,7 +13,6 @@ import {
   STUDY_HABITS,
   CHALLENGES,
   TASK_TYPES,
-  TASK_FREQUENCIES,
   type SessionLength,
   type AgeBand,
   type TaskType,

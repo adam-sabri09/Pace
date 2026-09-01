@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 /**
  * Format a UTC ISO string in the viewer's local timezone.
@@ -19,13 +19,14 @@ export function formatLocalTime(utcIso: string, timeZone?: string): string {
   });
 }
 
+const subscribe = () => () => {};
+
 /**
  * Renders a UTC ISO timestamp in the viewer's local timezone.
  *
- * During SSR the raw ISO string is emitted so the server and client
- * initial renders match; after hydration useEffect swaps it for the
- * locale-formatted version using the browser's own Intl API — which
- * honours DST correctly without any hardcoded timezone.
+ * Uses useSyncExternalStore so the server snapshot (raw ISO) is used
+ * during SSR/hydration and the client snapshot (locale-formatted) is
+ * used in the browser — no hydration mismatch, no extra render.
  */
 export function LocalTime({
   utcIso,
@@ -34,11 +35,11 @@ export function LocalTime({
   utcIso: string;
   className?: string;
 }) {
-  const [display, setDisplay] = useState(utcIso);
-
-  useEffect(() => {
-    setDisplay(formatLocalTime(utcIso));
-  }, [utcIso]);
+  const display = useSyncExternalStore(
+    subscribe,
+    () => formatLocalTime(utcIso),
+    () => utcIso,
+  );
 
   return (
     <time dateTime={utcIso} className={className}>

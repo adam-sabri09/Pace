@@ -7,8 +7,6 @@ import { ClearErrorsButton } from "@/components/admin/ClearErrorsButton";
 
 // Temporarily: all authenticated users can access /admin.
 
-type StatRow = { count: string } | null;
-
 async function fetchStats() {
   const db = createServiceClient();
 

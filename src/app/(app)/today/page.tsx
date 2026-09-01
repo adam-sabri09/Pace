@@ -9,7 +9,7 @@ import { detectAndMarkMissedAction } from "@/server/actions/sessions";
 import { buildTodayRecommendation, type SubjectIntelligenceWithTopics } from "@/lib/personalization/recommender";
 import { scorePersonalization, scoreFromNewProfile } from "@/lib/personalization/scoring";
 import { getRecommendationPresentation } from "@/lib/personalization/recommendation-presentation";
-import type { PersonalizationAnswers, SubjectIntelligence, TechniqueKey } from "@/lib/personalization/types";
+import type { PersonalizationAnswers, TechniqueKey } from "@/lib/personalization/types";
 import { selectTechnique, type HybridTechniqueResult } from "@/lib/ml/hybrid";
 import type { TrainingExample } from "@/lib/ml/features";
 import { encodeFeatures } from "@/lib/ml/features";
@@ -213,7 +213,7 @@ export default async function TodayPage() {
         : null;
 
     // Fetch KNN training examples using service role (bypasses RLS to read other users).
-    let trainingExamples: TrainingExample[] = [];
+    const trainingExamples: TrainingExample[] = [];
     try {
       const svc = createServiceClient();
       const { data: otherProfiles } = await svc

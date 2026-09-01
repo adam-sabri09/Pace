@@ -145,55 +145,13 @@ export function MemoryGameStep({ onScore }: Props) {
 
   const readingStartRef = useRef<number>(0);
   const qStartRef = useRef<number>(0);
+  // Refs mirror the countdown state so interval callbacks always read the
+  // current value — vi.advanceTimersByTime fires all ticks before React
+  // re-renders, which would leave useState closures stale.
+  const readingCountRef = useRef(READ_SECONDS);
+  const qCountRef = useRef(QUESTION_SECONDS);
 
-  // ── Reading countdown ────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (phase !== "reading") return;
-    if (readingLeft <= 0) return;
-    const id = window.setInterval(
-      () => setReadingLeft((s) => Math.max(0, s - 1)),
-      1000,
-    );
-    return () => clearInterval(id);
-  }, [phase, readingLeft]);
-
-  // Auto-advance to questions when reading timer hits 0
-  useEffect(() => {
-    if (phase === "reading" && readingLeft === 0) {
-      beginQuestions();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readingLeft, phase]);
-
-  // ── Per-question countdown ───────────────────────────────────────────────
-
-  useEffect(() => {
-    if (phase !== "questions" || answered) return;
-    if (qLeft <= 0) return;
-    const id = window.setInterval(
-      () => setQLeft((s) => Math.max(0, s - 1)),
-      1000,
-    );
-    return () => clearInterval(id);
-  }, [phase, answered, qLeft]);
-
-  // Auto-submit when question timer hits 0
-  useEffect(() => {
-    if (phase === "questions" && qLeft === 0 && !answered) {
-      // Record as incorrect, time = QUESTION_SECONDS * 1000
-      recordAnswer(-1);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qLeft, answered, phase]);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
-
-  const startReading = useCallback(() => {
-    readingStartRef.current = Date.now();
-    setReadingLeft(READ_SECONDS);
-    setPhase("reading");
-  }, []);
+  // ── Callbacks declared before the effects that use them ─────────────────
 
   const beginQuestions = useCallback(() => {
     qStartRef.current = Date.now();
@@ -220,6 +178,44 @@ export function MemoryGameStep({ onScore }: Props) {
     },
     [answered, currentQ],
   );
+
+  // ── Reading countdown — single interval; ref avoids stale closure ─────────
+  useEffect(() => {
+    if (phase !== "reading") return;
+    readingCountRef.current = READ_SECONDS;
+    const id = window.setInterval(() => {
+      const next = Math.max(0, readingCountRef.current - 1);
+      readingCountRef.current = next;
+      setReadingLeft(next);
+      if (next === 0) {
+        beginQuestions();
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, beginQuestions]);
+
+  // ── Per-question countdown — single interval; ref avoids stale closure ───
+  useEffect(() => {
+    if (phase !== "questions" || answered) return;
+    qCountRef.current = QUESTION_SECONDS;
+    const id = window.setInterval(() => {
+      const next = Math.max(0, qCountRef.current - 1);
+      qCountRef.current = next;
+      setQLeft(next);
+      if (next === 0) {
+        recordAnswer(-1);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, answered, recordAnswer]);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+
+  const startReading = useCallback(() => {
+    readingStartRef.current = Date.now();
+    setReadingLeft(READ_SECONDS);
+    setPhase("reading");
+  }, []);
 
   const advance = useCallback(() => {
     const nextResults = results;

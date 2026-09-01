@@ -32,12 +32,12 @@ export function PracticeUI({
   const [question, setQuestion] = useState<ClientQuestion>(initialQuestion);
   const [questionsAnswered, setQuestionsAnswered] = useState(initialQuestionsAnswered);
   const [correctCount, setCorrectCount] = useState(initialCorrectCount);
-  const [difficulty, setDifficulty] = useState<Difficulty>(initialDifficulty);
+  const [difficulty] = useState<Difficulty>(initialDifficulty);
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<{ text: string; isCorrect: boolean } | null>(null);
   const [summary, setSummary] = useState<PracticeSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
+  const startTimeRef = useRef<number>(0);
   const MAX_QUESTIONS = 10;
 
   function handleStartQuestion() {
