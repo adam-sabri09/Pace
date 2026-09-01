@@ -113,6 +113,9 @@ export async function uploadCourseworkAction(
     .single();
 
   if (insertErr || !itemRow) {
+    const errMsg = insertErr?.message ?? "no data returned";
+    console.error("[coursework] insert failed:", errMsg, "code:", insertErr?.code, "details:", insertErr?.details);
+    await logAppError("coursework_upload", errMsg, { step: "insert_coursework_item", code: insertErr?.code, details: insertErr?.details }, user.id);
     return { ok: false, error: "Could not create entry. Try again." };
   }
   const itemId = itemRow.id as string;
