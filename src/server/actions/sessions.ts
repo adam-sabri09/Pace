@@ -198,11 +198,10 @@ export async function markMissedAction(
   }
 
   // Record event + update mastery (fire-and-forget).
-  const eventType = elapsedSeconds > 60 ? "abandoned" : "abandoned";
   void supabase.from("session_events").insert({
     user_id: user.id,
     study_session_id: parsed.data.sessionId,
-    event_type: eventType,
+    event_type: "abandoned",
     metadata: { elapsed_seconds: elapsedSeconds },
   });
 

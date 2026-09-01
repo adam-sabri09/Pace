@@ -119,11 +119,21 @@ export async function commitOnboardingAction(
   }
 
   // 6. Workload items (best-effort — subject_tasks may not exist yet).
+  // Generate a default title from task type so these items pass the
+  // .filter(t => t.title) checks in plan generation and /today display.
+  const TASK_TITLES: Record<string, string> = {
+    exam: "Exam",
+    homework: "Homework",
+    quiz: "Quiz",
+    assignment: "Assignment",
+    project: "Project",
+  };
   const workloadPayload = input.subjects.flatMap((s, i) =>
     (s.workloadItems ?? []).map((w) => ({
       user_id: user.id,
       subject_id: subjectIds[i],
       task_type: w.taskType,
+      title: TASK_TITLES[w.taskType] ?? w.taskType,
       due_date: w.dueDate ?? null,
       frequency: w.frequency ?? null,
       priority: w.priority ?? "medium",
