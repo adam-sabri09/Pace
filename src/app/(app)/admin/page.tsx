@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { LocalTime } from "@/components/LocalTime";
 
 // Temporarily: all authenticated users can access /admin.
 
@@ -385,9 +386,10 @@ export default async function AdminPage() {
                     <span className="inline-block font-label-sm text-label-sm bg-error-container text-on-error-container rounded-full px-2 py-0.5 mr-2">
                       {ERROR_LABELS[err.error_type as string] ?? err.error_type}
                     </span>
-                    <span className="font-body-sm text-body-sm text-outline">
-                      {new Date(err.created_at as string).toLocaleString()}
-                    </span>
+                    <LocalTime
+                      utcIso={err.created_at as string}
+                      className="font-body-sm text-body-sm text-outline"
+                    />
                   </div>
                   {err.user_id && (
                     <span className="font-mono text-xs text-outline-variant">
