@@ -65,6 +65,61 @@ Google Gemini API
 
 ---
 
+## Infrastructure topology
+
+```mermaid
+flowchart LR
+    Browser["Browser\n(React client components)"]
+    Vercel["Vercel — Fluid Compute\n(Next.js App Router\nNode.js runtime)"]
+    Supabase["Supabase\n(Postgres + Auth\nPostgREST API)"]
+    Gemini["Google Gemini API\n(gemini-3.6-flash)"]
+
+    Browser -- "HTTPS (server actions\nform POSTs, RSC)" --> Vercel
+    Vercel -- "PostgREST / JWT\n(anon key + service role)" --> Supabase
+    Vercel -- "HTTPS REST\n(API key, server-side only)" --> Gemini
+```
+
+All Gemini calls and all service-role Supabase calls originate from Vercel server-side code only. The browser never holds the API key or service-role key.
+
+---
+
+## Data flow
+
+```mermaid
+flowchart TD
+    User["Student"]
+
+    subgraph Browser["Browser"]
+        RC["React client\ncomponents"]
+    end
+
+    subgraph Vercel["Vercel (server)"]
+        SA["Server Actions\n(auth, plan, sessions,\ncoursework, practice, coach…)"]
+        SC["Server Components\n(data fetch + initial render)"]
+        LLM["LLM layer\n(generate, validate, diff)"]
+    end
+
+    subgraph Data["Data stores"]
+        DB["Supabase Postgres\n(RLS-protected)"]
+        Auth["Supabase Auth\n(JWT sessions)"]
+    end
+
+    AI["Google Gemini API"]
+
+    User --> RC
+    RC -- "server action call" --> SA
+    SC -- "RLS-scoped SELECT" --> DB
+    SA -- "auth check" --> Auth
+    SA -- "RLS-scoped read/write" --> DB
+    SA --> LLM
+    LLM -- "generateObject / generateText" --> AI
+    AI -- "structured JSON response" --> LLM
+    SC -- "rendered HTML" --> RC
+    SA -- "result" --> RC
+```
+
+---
+
 ## Authentication flow
 
 ```mermaid

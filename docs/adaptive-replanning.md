@@ -98,6 +98,29 @@ The replan operation itself is also idempotent at the session level: the generat
 
 ---
 
+## Decision flowchart
+
+```mermaid
+flowchart TD
+    A(["/today page loads"]) --> B["Auto-detect: mark previous-day\nscheduled sessions as missed\nNo replan"]
+    B --> C{Student action on a session card}
+
+    C -- "tap Complete" --> D["status = completed\nSession preserved in history"]
+    D --> E["No replan — plan still valid"]
+
+    C -- "tap Missed" --> F["status = missed\nSession preserved in history"]
+    F --> G["Replan triggered"]
+    G --> H["DELETE all scheduled sessions"]
+    H --> I["Read profile + subjects +\navailability + completed sessions"]
+    I --> J["AI generates new schedule\n~8–25s"]
+    J --> K["INSERT new scheduled sessions"]
+    K --> L["Compute diff vs old schedule"]
+    L --> M["Session Missed overlay → Plan Updated overlay\nChanges + warnings shown to student"]
+    M --> N(["/today refreshed"])
+
+    E --> N
+```
+
 ## Current Behavior Summary
 
 | Action | Session status updated | Replan triggered | Overlay shown |

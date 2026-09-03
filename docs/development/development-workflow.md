@@ -4,6 +4,26 @@ This document describes the step-by-step process for implementing any feature or
 
 ---
 
+## Implementation cycle overview
+
+```mermaid
+flowchart TD
+    S1["1. Read requirements\ndocs/requirements/"] --> S2
+    S2["2. Inspect architecture\nWhich tables, actions, components?"] --> S3
+    S3["3. Implement\nSmall, incremental. Auth + scope on every mutation."] --> S4
+    S4["4. Unit test\nPure functions and new helpers"] --> S5
+    S5["5. Functional test\nFollow the user journey manually"] --> S6
+    S6["6. Smoke test\nVerify nothing else broke"] --> S7
+    S7["7. Lint + TypeScript\nnpm run lint && npx tsc --noEmit"] --> S8
+    S8["8. Full test suite\nnpx vitest run — all must pass"] --> S9
+    S9["9. Production build\nnpm run build"] --> S10
+    S10["10. Review diff\ngit diff main — no secrets, no unrelated changes"] --> S11
+    S11["11. Commit\nfeat / fix / refactor / docs / chore"] --> S12
+    S12["12. Push + open PR\nagainst main — CI must be green before merge"]
+```
+
+---
+
 ## Before you start
 
 1. Make sure your local environment is running:

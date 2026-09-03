@@ -4,6 +4,18 @@ This document explains how to run Pace locally so you can test the full app end-
 
 ## Overview
 
+```mermaid
+flowchart LR
+    Browser["Browser\nlocalhost:3000"]
+    Next["Next.js dev server\nnpm run dev\nHMR enabled"]
+    Supa["Local Supabase\nnpx supabase start\nPostgres + Auth + Studio\n127.0.0.1:54321"]
+    Gemini["Google Gemini API\nReal API key required\nNo local alternative"]
+
+    Browser -- "HTTP" --> Next
+    Next -- "PostgREST\n127.0.0.1:54321" --> Supa
+    Next -- "HTTPS REST\n(server-side only)" --> Gemini
+```
+
 Pace has three runtime dependencies:
 
 | Dependency | Local substitute | Notes |

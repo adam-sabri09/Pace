@@ -2,7 +2,30 @@
 
 Only the flows in the MVP. Each is described as a sequence of user actions and system responses.
 
+---
+
 ## Flow 1: First-time signup and onboarding wizard
+
+```mermaid
+flowchart TD
+    A(["/  landing page"]) --> B["Click Get Started"]
+    B --> C["/signup\nEnter name · email · password\nConfirm age 13+"]
+    C --> D{Validation}
+    D -- invalid --> C
+    D -- valid --> E["Supabase creates account\nBrowser timezone detected"]
+    E --> F["/onboarding wizard"]
+    F --> G["Step 1 — Subjects\nAdd subject names"]
+    G --> H["Step 2 — Topics\nAdd topics per subject"]
+    H --> I["Step 3 — Exam dates\nSet date per subject\nat least one required"]
+    I --> J["Step 4 — Availability\nAdd time windows per weekday"]
+    J --> K["Step 5 — Session length\nPick 25 / 45 / 60 min"]
+    K --> L["Review screen\nConfirm all inputs"]
+    L --> M["Create my plan\n~8–25s AI generation"]
+    M --> N{Plan generated?}
+    N -- error --> O["Error shown\nInputs preserved"]
+    O --> M
+    N -- success --> P["/today\nFirst plan displayed"]
+```
 
 1. Student lands on `/` (landing).
 2. Clicks **Get Started**.
@@ -17,12 +40,30 @@ Only the flows in the MVP. Each is described as a sequence of user actions and s
 11. Loading state (up to ~20s).
 12. On success, redirected to `/today`.
 
+---
+
 ## Flow 2: Daily use (returning student)
+
+```mermaid
+flowchart TD
+    A(["/today\nToday's sessions"]) --> B{Student action}
+    B -- "tap Complete" --> C["status = completed\nNo replan"]
+    C --> A
+    B -- "tap Missed" --> D["status = missed\nReplan triggered"]
+    D --> E["Session Missed overlay\nShown while replanning"]
+    E --> F["AI generates new schedule\n~8–25s"]
+    F --> G["Plan Updated overlay\nShows what changed + warnings"]
+    G --> A
+    B -- "open session" --> H["Flow 8 — Study Session timer"]
+    H --> A
+```
 
 1. Student opens the app (already logged in) → lands on `/today`.
 2. Sees today's sessions in chronological order, greeted by first name ("Good Morning, Alex").
 3. For each session, taps **Complete** on the session card, OR opens the session for a focused study workflow (Flow 8).
 4. If they cannot do a session, taps **Missed** — the **Session Missed** in-page overlay appears while the plan re-plans, then transitions to the **Plan Updated** overlay summarizing changes, then returns to the refreshed `/today` view.
+
+---
 
 ## Flow 3: View the full plan
 
@@ -30,6 +71,8 @@ Only the flows in the MVP. Each is described as a sequence of user actions and s
 2. Sees upcoming sessions grouped by day, up to the last exam date.
 3. Past completed and missed sessions visible but visually distinct.
 4. Navigates back to `/today`.
+
+---
 
 ## Flow 4: Update availability
 
@@ -39,6 +82,8 @@ Only the flows in the MVP. Each is described as a sequence of user actions and s
 4. Confirmation appears; the plan re-plans in the background.
 5. Returns to `/today` (updated).
 
+---
+
 ## Flow 5: Manage subjects and topics
 
 1. From nav, taps **Subjects** (`/subjects`).
@@ -46,11 +91,15 @@ Only the flows in the MVP. Each is described as a sequence of user actions and s
 3. Taps **Save**.
 4. Plan is regenerated from the current time forward. Completed sessions are preserved.
 
+---
+
 ## Flow 6: Warning when a topic no longer fits
 
 1. During any re-plan, if a topic cannot fit before its exam date given remaining availability, a non-blocking warning appears at the top of `/today` and `/plan`.
 2. The warning tells the user which topic is at risk and suggests either adding availability or shortening the topic list.
 3. The user can dismiss the warning; it reappears on the next re-plan if still unresolved.
+
+---
 
 ## Flow 7: Delete account
 
@@ -58,7 +107,24 @@ Only the flows in the MVP. Each is described as a sequence of user actions and s
 2. Confirmation dialog.
 3. On confirm, all user data is deleted; user is logged out and redirected to `/`.
 
+---
+
 ## Flow 8: Study Session with timer
+
+```mermaid
+flowchart TD
+    A["Open session from /today"] --> B["/study/sessionId\nShow subject · topic · instruction · timer"]
+    B --> C["Tap Start Session\nTimer counts down"]
+    C --> D{Student action}
+    D -- "Pause" --> E["Timer halts\nResume button shown"]
+    E -- "Resume" --> C
+    D -- "Finish / timer reaches zero" --> F{Complete or Missed?}
+    F -- Complete --> G["status = completed\nSession Complete overlay\nNext up shown"]
+    G --> H["/today"]
+    F -- Missed --> I["status = missed\nReplan triggered\nSession Missed → Plan Updated overlays"]
+    I --> H
+    D -- "Close screen mid-session" --> J["Return to /today\nSession still scheduled\nTimer state not saved"]
+```
 
 1. From `/today`, the student taps a session card → navigates to `/study/[sessionId]` (or an equivalent focus route).
 2. The screen shows subject chip, topic title, instruction, and the countdown timer initialised to the session's duration (e.g. 45:00).
@@ -69,14 +135,43 @@ Only the flows in the MVP. Each is described as a sequence of user actions and s
    - **Missed** → follows the Missed branch of Flow 2 (Session Missed → Plan Updated → back to `/today`).
 6. Closing the timer screen mid-session returns the user to `/today` with the session still `scheduled`. Timer state is not persisted.
 
+---
+
+## Flow 9: Coursework upload and practice
+
+```mermaid
+flowchart TD
+    A["/coursework\nLibrary of uploaded items"] --> B["Click Upload"]
+    B --> C["Select file\nJPEG / PNG / PDF / text\nmax 5 MB"]
+    C --> D["Upload + AI extraction\n~5–20s"]
+    D --> E{Extraction result}
+    E -- ready --> F["Item appears as ready\nTopics · definitions · key facts shown"]
+    E -- failed --> G["Error shown\nCan retry"]
+    F --> H["Click Start practice"]
+    H --> I["Practice session starts\nFirst question generated"]
+    I --> J{Up to 10 questions}
+    J -- "Submit answer" --> K["AI evaluates\nFeedback shown\nDifficulty adjusted"]
+    K --> L{Session complete?}
+    L -- no --> J
+    L -- yes after Q10 --> M["Summary screen\nQuestions · correct · accuracy"]
+    J -- "End early" --> M
+```
+
+1. Student navigates to `/coursework`.
+2. Uploads a file (image, PDF, or text). File is passed to Gemini for extraction — never stored on disk.
+3. Once `ready`, the item shows its extracted topics, definitions, and key facts.
+4. Student taps **Start practice** — a 10-question adaptive session begins.
+5. After each answer, difficulty adjusts based on correctness and response time.
+6. Session ends after 10 questions or when the student ends it early.
+
+---
+
 ## Explicit non-flows
 
 Not in the MVP:
 - Parent accounts, sharing, or observing another user's plan.
 - Notifications (push/email/SMS) or search.
 - LMS import (Google Classroom / Canvas).
-- Syllabus PDF/photo upload.
 - Payments / subscription flows.
-- Content generation (flashcards, summaries, quizzes).
 - Analytics or "share data" toggles.
 - Focus Mode Auto-Start or complex Pomodoro cycles.
