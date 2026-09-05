@@ -113,6 +113,7 @@ export default async function SettingsPage({
 
       <GoogleCalendarSection
         connected={calendarStatus.connected}
+        email={calendarStatus.connected ? calendarStatus.email : null}
         configured={!!process.env.GOOGLE_CLIENT_ID}
       />
 

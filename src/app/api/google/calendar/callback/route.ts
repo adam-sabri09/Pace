@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -8,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/service";
  * google_connections so server-side calendar fetches can run without
  * prompting the user again.
  *
- * GET /api/google/calendar/callback?code=...&state=<userId>
+ * GET /api/google/calendar/callback?code=...&state=<nonce>
  *
  * Required env vars:
  *   GOOGLE_CLIENT_ID
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
-  const state = searchParams.get("state"); // userId passed in auth route
+  const state = searchParams.get("state");
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? new URL(request.url).origin;
 
   if (error || !code || !state) {
@@ -28,13 +29,25 @@ export async function GET(request: Request) {
     );
   }
 
-  // Verify the authenticated user matches the state.
+  // --- CSRF verification ---
+  // Compare the state parameter from Google against the nonce stored in the
+  // browser cookie set by the auth route. Reject if missing or mismatched.
+  const cookieStore = await cookies();
+  const storedNonce = cookieStore.get("google_cal_oauth_state")?.value;
+
+  if (!storedNonce || storedNonce !== state) {
+    return NextResponse.redirect(
+      `${origin}/settings?error=google_calendar_cancelled`,
+    );
+  }
+
+  // Verify the user is still authenticated.
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user || user.id !== state) {
+  if (!user) {
     return NextResponse.redirect(`${origin}/login`);
   }
 
@@ -62,9 +75,7 @@ export async function GET(request: Request) {
   });
 
   if (!tokenRes.ok) {
-    return NextResponse.redirect(
-      `${origin}/settings?error=google_token_error`,
-    );
+    return clearStateAndRedirect(origin, "google_token_error");
   }
 
   const tokens = (await tokenRes.json()) as {
@@ -75,9 +86,23 @@ export async function GET(request: Request) {
   };
 
   if (!tokens.access_token) {
-    return NextResponse.redirect(
-      `${origin}/settings?error=google_token_error`,
+    return clearStateAndRedirect(origin, "google_token_error");
+  }
+
+  // Fetch the connected account email using the fresh access token.
+  // Failure is non-fatal — we store null and the UI degrades gracefully.
+  let email: string | null = null;
+  try {
+    const userinfoRes = await fetch(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      { headers: { Authorization: `Bearer ${tokens.access_token}` } },
     );
+    if (userinfoRes.ok) {
+      const info = (await userinfoRes.json()) as { email?: string };
+      email = info.email ?? null;
+    }
+  } catch {
+    // Non-fatal: proceed without email
   }
 
   const expiry = tokens.expires_in
@@ -86,9 +111,7 @@ export async function GET(request: Request) {
 
   const scopes = tokens.scope?.split(" ") ?? [];
 
-  // Upsert the connection row via service role (the user's cookie session
-  // has RLS permission, but service role avoids any edge-case policy issues
-  // on first-time inserts).
+  // Upsert the connection row via service role.
   const svc = createServiceClient();
   const { error: upsertError } = await svc
     .from("google_connections")
@@ -99,15 +122,29 @@ export async function GET(request: Request) {
         refresh_token: tokens.refresh_token ?? null,
         token_expiry: expiry,
         scopes,
+        email,
       },
       { onConflict: "user_id" },
     );
 
   if (upsertError) {
-    return NextResponse.redirect(
-      `${origin}/settings?error=google_save_error`,
-    );
+    return clearStateAndRedirect(origin, "google_save_error");
   }
 
-  return NextResponse.redirect(`${origin}/settings?connected=google_calendar`);
+  // Clear the CSRF cookie now that the flow is complete.
+  const response = NextResponse.redirect(
+    `${origin}/settings?connected=google_calendar`,
+  );
+  response.cookies.set("google_cal_oauth_state", "", {
+    maxAge: 0,
+    path: "/",
+  });
+  return response;
+}
+
+/** Redirects to settings with an error query param. */
+function clearStateAndRedirect(origin: string, errorCode: string): NextResponse {
+  const response = NextResponse.redirect(`${origin}/settings?error=${errorCode}`);
+  response.cookies.set("google_cal_oauth_state", "", { maxAge: 0, path: "/" });
+  return response;
 }

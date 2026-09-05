@@ -30,6 +30,11 @@ export async function GET(request: Request) {
     );
   }
 
+  // Generate a cryptographically random CSRF nonce (32 bytes → 64 hex chars).
+  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
   const redirectUri = `${siteUrl}/api/google/calendar/callback`;
 
   const params = new URLSearchParams({
@@ -42,9 +47,22 @@ export async function GET(request: Request) {
     ].join(" "),
     access_type: "offline",
     prompt: "consent",
-    state: user.id,
+    state: nonce,
   });
 
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-  return NextResponse.redirect(authUrl);
+
+  const response = NextResponse.redirect(authUrl);
+
+  // Store the nonce in a short-lived HTTP-only cookie so the callback can
+  // verify the state parameter and reject forged OAuth responses.
+  response.cookies.set("google_cal_oauth_state", nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 600, // 10 minutes — long enough for a slow user, short enough to limit window
+    path: "/",
+  });
+
+  return response;
 }
