@@ -7,6 +7,62 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { AddSubjectSchema } from "@/lib/validation/subjects";
 
+// ---------------------------------------------------------------------------
+// Delete past exams
+// ---------------------------------------------------------------------------
+
+export type DeletePassedExamsResult =
+  | { ok: true; count: number }
+  | { ok: false; error: string };
+
+/**
+ * Clears exam_date on subjects whose exam date has already passed.
+ * Does NOT delete the subject, topics, or session history — only removes the
+ * exam date so these subjects no longer appear in the "Your subjects" progress
+ * section on /plan.
+ */
+export async function deletePassedExamsAction(): Promise<DeletePassedExamsResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You need to be signed in." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("time_zone")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const timeZone = (profile?.time_zone as string | null) ?? "UTC";
+  const today = new Date().toLocaleDateString("en-CA", { timeZone }); // YYYY-MM-DD
+
+  // Count affected subjects before clearing so we can report the number.
+  const { data: passedSubjects, error: fetchError } = await supabase
+    .from("subjects")
+    .select("id")
+    .eq("user_id", user.id)
+    .not("exam_date", "is", null)
+    .lt("exam_date", today);
+
+  if (fetchError) return { ok: false, error: "Could not fetch past exams." };
+  if (!passedSubjects || passedSubjects.length === 0) return { ok: true, count: 0 };
+
+  const { error: updateError } = await supabase
+    .from("subjects")
+    .update({ exam_date: null })
+    .eq("user_id", user.id)
+    .not("exam_date", "is", null)
+    .lt("exam_date", today);
+
+  if (updateError) return { ok: false, error: "Could not clear past exams. Try again." };
+
+  revalidatePath("/plan");
+  revalidatePath("/today");
+
+  return { ok: true, count: passedSubjects.length };
+}
+
 export type AddSubjectResult = { ok: true } | { ok: false; error: string };
 
 export async function addSubjectAction(raw: unknown): Promise<AddSubjectResult> {

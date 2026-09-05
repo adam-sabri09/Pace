@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { uploadCourseworkAction } from "@/server/actions/coursework";
+import { uploadCourseworkAction, type CourseworkItem } from "@/server/actions/coursework";
+import { DriveImportButton } from "@/components/coursework/drive-import-button";
 
 export function CourseworkUploadForm() {
   const router = useRouter();
@@ -14,6 +15,10 @@ export function CourseworkUploadForm() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setFileName(e.target.files?.[0]?.name ?? null);
     setError(null);
+  }
+
+  function handleDriveImport(item: CourseworkItem) {
+    router.push(`/coursework/${item.id}`);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -80,6 +85,14 @@ export function CourseworkUploadForm() {
       >
         {isPending ? "Extracting content…" : "Upload and analyse"}
       </button>
+
+      <div className="flex items-center gap-3 pt-2">
+        <span className="flex-1 h-px bg-outline-variant" aria-hidden="true" />
+        <span className="font-label-sm text-label-sm text-outline">or</span>
+        <span className="flex-1 h-px bg-outline-variant" aria-hidden="true" />
+      </div>
+
+      <DriveImportButton onImported={handleDriveImport} />
     </form>
   );
 }

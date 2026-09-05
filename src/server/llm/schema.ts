@@ -97,4 +97,12 @@ export type PlanInput = {
       confidencePct?: number; // 0-100
     }>;
   };
+  /**
+   * Google Calendar busy periods. Sessions must not overlap these windows.
+   * Fetched server-side from the user's Google Calendar (if connected).
+   */
+  calendarBusyPeriods?: Array<{
+    startsAt: string; // ISO UTC
+    endsAt: string;   // ISO UTC
+  }>;
 };

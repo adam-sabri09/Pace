@@ -1,0 +1,35 @@
+# Local production-like environment for Pace.
+#
+# Prerequisites:
+#   1. Docker Desktop installed and running
+#   2. npx supabase start  (starts local Postgres, Auth, PostgREST, Studio)
+#   3. cp .env.example .env.docker && fill in local Supabase values
+#
+# Usage:
+#   docker compose up --build        # first time or after code changes
+#   docker compose up                # subsequent runs (image is cached)
+#   docker compose down              # stop
+#
+# Supabase Studio (DB browser): http://localhost:54323
+# App:                          http://localhost:3000
+
+services:
+  web:
+    build:
+      context: .
+      # Pass NEXT_PUBLIC_* vars at build time so Next.js inlines them.
+      # Server-only vars (SUPABASE_SERVICE_ROLE_KEY, GOOGLE_GENERATIVE_AI_API_KEY,
+      # ADMIN_EMAILS) are passed at runtime via env_file only.
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.docker
+    # Allow the container to reach the host (where local Supabase runs).
+    # On Docker Desktop (macOS/Windows) host.docker.internal resolves automatically.
+    # On Linux this extra_hosts entry is required.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

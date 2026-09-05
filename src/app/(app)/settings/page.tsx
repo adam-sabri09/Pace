@@ -3,20 +3,31 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { logOutAction } from "@/server/actions/auth";
+import { getGoogleCalendarStatusAction } from "@/server/actions/google-calendar";
 import { AvailabilityEditor } from "./availability-editor";
+import { GoogleCalendarSection } from "./google-calendar-section";
 import type { SessionLength } from "@/lib/validation/onboarding";
 
 /**
- * /settings — manage availability, session length, subjects.
+ * /settings — manage availability, session length, subjects, integrations.
  */
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ connected?: string; disconnected?: string; error?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [profileRes, availRes] = await Promise.all([
+  const params = await searchParams;
+  const feedbackConnected = params.connected === "google_calendar";
+  const feedbackDisconnected = params.disconnected === "google_calendar";
+  const feedbackError = params.error;
+
+  const [profileRes, availRes, calendarStatus] = await Promise.all([
     supabase
       .from("profiles")
       .select("session_length_minutes")
@@ -27,6 +38,7 @@ export default async function SettingsPage() {
       .select("day_of_week, starts_at, ends_at")
       .eq("user_id", user.id)
       .order("day_of_week", { ascending: true }),
+    getGoogleCalendarStatusAction(),
   ]);
 
   const sessionLength = (profileRes.data?.session_length_minutes ?? 45) as SessionLength;
@@ -47,6 +59,27 @@ export default async function SettingsPage() {
           Changes to availability or session length will rebuild your plan automatically.
         </p>
       </header>
+
+      {(feedbackConnected || feedbackDisconnected || feedbackError) && (
+        <div
+          role="status"
+          className={`rounded-lg px-4 py-3 font-body-md text-body-md ${
+            feedbackError
+              ? "bg-error/10 text-error"
+              : "bg-primary/10 text-primary"
+          }`}
+        >
+          {feedbackConnected && "Google Calendar connected. Your plan will avoid your busy times."}
+          {feedbackDisconnected && "Google Calendar disconnected."}
+          {feedbackError === "google_calendar_cancelled" && "Google Calendar connection cancelled."}
+          {feedbackError === "google_not_configured" && "Google integration is not configured yet."}
+          {feedbackError === "google_token_error" && "Could not get a Google token. Please try again."}
+          {feedbackError === "google_save_error" && "Could not save the connection. Please try again."}
+          {feedbackError &&
+            !["google_calendar_cancelled", "google_not_configured", "google_token_error", "google_save_error"].includes(feedbackError) &&
+            "Something went wrong. Please try again."}
+        </div>
+      )}
 
       <AvailabilityEditor
         initialWindows={initialWindows}
@@ -77,6 +110,11 @@ export default async function SettingsPage() {
           </Link>
         </div>
       </section>
+
+      <GoogleCalendarSection
+        connected={calendarStatus.connected}
+        configured={!!process.env.GOOGLE_CLIENT_ID}
+      />
 
       <section className="border border-outline-variant rounded-xl p-stack-md bg-surface-container-lowest">
         <h2 className="font-headline-md text-headline-md text-on-surface flex items-center gap-base border-b border-outline-variant pb-base mb-stack-md">

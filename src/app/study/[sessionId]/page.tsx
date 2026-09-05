@@ -31,17 +31,26 @@ export default async function StudyPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: session } = await supabase
-    .from("sessions")
-    .select(
-      "id, duration_minutes, instruction, status, topic:topics(name, subject:subjects(name))",
-    )
-    .eq("id", sessionId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [sessionRes, profileRes] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select(
+        "id, duration_minutes, instruction, status, topic:topics(name, subject:subjects(name))",
+      )
+      .eq("id", sessionId)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("age_band")
+      .eq("id", user.id)
+      .maybeSingle(),
+  ]);
+  const session = sessionRes.data;
 
   if (!session || session.status !== "scheduled") redirect("/today");
 
+  const ageBand = (profileRes.data?.age_band as string | null) ?? null;
   const topic = Array.isArray(session.topic) ? session.topic[0] : session.topic;
   const subject = topic
     ? Array.isArray(topic.subject)
@@ -56,6 +65,7 @@ export default async function StudyPage({
       topicName={(topic?.name as string | undefined) ?? "Study session"}
       instruction={session.instruction as string}
       durationMinutes={session.duration_minutes as number}
+      ageBand={ageBand}
     />
   );
 }

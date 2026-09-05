@@ -295,7 +295,8 @@ export async function submitAnswerAction(
         current_difficulty: nextDifficulty,
         current_question: null,
       })
-      .eq("id", sessionId);
+      .eq("id", sessionId)
+      .eq("user_id", user.id);
 
     return { ok: true, isCorrect, feedback, nextQuestion: null, sessionComplete: true };
   }
@@ -420,6 +421,66 @@ export async function getPracticeSessionAction(
 }
 
 // ---------------------------------------------------------------------------
+// Retry next-question generation (called when submitAnswerAction returned
+// nextQuestion: null with sessionComplete: false)
+// ---------------------------------------------------------------------------
+
+export type RetryNextQuestionResult =
+  | { ok: true; question: ClientQuestion }
+  | { ok: false; error: string };
+
+export async function retryNextQuestionAction(
+  sessionId: string,
+): Promise<RetryNextQuestionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated." };
+
+  const { data: session } = await supabase
+    .from("practice_sessions")
+    .select(
+      "id, coursework_item_id, current_difficulty, questions_answered, current_question, status",
+    )
+    .eq("id", sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!session || session.status !== "active") {
+    return { ok: false, error: "Session not found." };
+  }
+
+  // If a concurrent call already stored a question, return it immediately.
+  const existing = session.current_question as StoredQuestion | null;
+  if (existing) return { ok: true, question: toClientQuestion(existing) };
+
+  const { data: itemRow } = await supabase
+    .from("coursework_items")
+    .select("extracted")
+    .eq("id", session.coursework_item_id as string)
+    .maybeSingle();
+
+  if (!itemRow?.extracted) return { ok: false, error: "Could not load study material." };
+
+  const question = await generateQuestion(
+    itemRow.extracted as CourseworkExtractedData,
+    session.current_difficulty as Difficulty,
+    session.questions_answered as number,
+  );
+
+  if (!question) return { ok: false, error: "Could not generate a question. Please try again." };
+
+  await supabase
+    .from("practice_sessions")
+    .update({ current_question: question })
+    .eq("id", sessionId)
+    .eq("user_id", user.id);
+
+  return { ok: true, question: toClientQuestion(question) };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -465,7 +526,7 @@ ${avoidConcept ? `\nDo NOT ask about "${avoidConcept}" again — choose a differ
 Generate exactly ONE question. Return the question text, type, concept tested, and a complete model answer.`,
         },
       ],
-      maxRetries: 0,
+      maxRetries: 1,
     });
     return object as StoredQuestion;
   } catch {

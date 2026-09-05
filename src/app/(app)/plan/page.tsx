@@ -6,6 +6,7 @@ import {
   computeSubjectProgress,
   type SubjectProgressData,
 } from "@/lib/progress";
+import { ClearPastExamsButton } from "@/components/plan/clear-past-exams-button";
 
 /**
  * /plan — full timeline grouped by day (DESIGN-SPEC §3.8).
@@ -36,6 +37,7 @@ export default async function PlanPage() {
   const [
     { data: sessions },
     { data: rawSubjects },
+    { count: passedExamCount },
     { data: activePlan },
   ] = await Promise.all([
     supabase
@@ -52,6 +54,13 @@ export default async function PlanPage() {
       .eq("user_id", user.id)
       .not("exam_date", "is", null)
       .order("exam_date", { ascending: true }),
+    // Count subjects with exam dates in the past (for the "Clear past exams" button).
+    supabase
+      .from("subjects")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .not("exam_date", "is", null)
+      .lt("exam_date", today),
     // Active plan warnings are stored as JSONB on the plan row.
     supabase
       .from("plans")
@@ -146,12 +155,17 @@ export default async function PlanPage() {
   return (
     <main className="w-full max-w-3xl mx-auto px-container-margin py-stack-lg flex flex-col gap-stack-md">
       <header className="border-b border-outline-variant pb-stack-sm">
-        <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-          Study Plan
-        </h1>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-          Your schedule, grouped by day.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
+              Study Plan
+            </h1>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1">
+              Your schedule, grouped by day.
+            </p>
+          </div>
+          <ClearPastExamsButton passedCount={passedExamCount ?? 0} />
+        </div>
       </header>
 
       {/* Subject progress section */}

@@ -74,7 +74,7 @@ export default function LandingPage() {
           Today
         </p>
         <h3 className="font-headline-md text-headline-md text-on-surface mt-1">
-          Tuesday, 23 August
+          Your study day, organised
         </h3>
       </div>
       <span className="rounded-full bg-secondary-container px-3 py-1 font-label-sm text-label-sm text-on-secondary-container">
@@ -171,7 +171,7 @@ export default function LandingPage() {
         {/* Final CTA. */}
         <section className="bg-surface-container-low border border-outline-variant/50 rounded-xl p-stack-lg text-center flex flex-col items-center justify-center gap-6 my-stack-lg">
           <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface max-w-lg">
-            Ready to structuralize your studies?
+            Ready to take control of your studies?
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant">
             Join Pace and let the system handle the planning.
@@ -188,26 +188,9 @@ export default function LandingPage() {
       {/* Footer. */}
       <footer className="w-full max-w-[1024px] mx-auto py-stack-lg flex flex-col items-center gap-stack-sm text-center border-t border-outline-variant bg-surface mt-auto">
         <div className="font-display text-headline-md text-primary mb-2">Pace</div>
-        <div className="flex gap-4 mb-2">
-          <a
-            className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors"
-            href="#"
-          >
-            Privacy
-          </a>
-          <a
-            className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors"
-            href="#"
-          >
-            Terms
-          </a>
-          <a
-            className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors"
-            href="#"
-          >
-            Support
-          </a>
-        </div>
+        <p className="font-label-sm text-label-sm text-on-surface-variant mb-2">
+          Pace collects only what it needs to build your plan. No ads. No tracking. No sharing.
+        </p>
         <p className="font-body-md text-body-md text-on-surface-variant">
           © 2026 Pace. Academic pressure, managed.
         </p>

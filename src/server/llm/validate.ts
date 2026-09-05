@@ -172,6 +172,26 @@ export function validatePlanOutput(
     }
   }
 
+  // 9. No session may overlap a Google Calendar busy period.
+  //    All comparisons are in UTC to avoid timezone/DST ambiguity.
+  if (input.calendarBusyPeriods && input.calendarBusyPeriods.length > 0) {
+    for (const session of sorted) {
+      for (const busy of input.calendarBusyPeriods) {
+        const busyStart = new Date(busy.startsAt).getTime();
+        const busyEnd = new Date(busy.endsAt).getTime();
+        const overlaps =
+          session.startsAtUTC.getTime() < busyEnd &&
+          session.endsAtUTC.getTime() > busyStart;
+        if (overlaps) {
+          return {
+            ok: false,
+            error: `Session "${session.subjectName} · ${session.topicName}" at ${session.startsAtUTC.toISOString()} conflicts with a Google Calendar event (${busy.startsAt}–${busy.endsAt}).`,
+          };
+        }
+      }
+    }
+  }
+
   return { ok: true, sessions: sorted, warnings: output.warnings };
 }
 

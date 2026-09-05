@@ -10,6 +10,7 @@ import {
 } from "@/server/actions/sessions";
 import { recordSessionEventAction } from "@/server/actions/events";
 import type { PlanChange, PlanWarning } from "@/server/llm/diff";
+import { getAgeBandUI } from "@/lib/personalization/age-band";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +39,7 @@ export type StudySessionProps = {
   topicName: string;
   instruction: string;
   durationMinutes: number;
+  ageBand?: string | null;
 };
 
 type StoredState = {
@@ -70,9 +72,11 @@ export function StudySession({
   topicName,
   instruction,
   durationMinutes,
+  ageBand,
 }: StudySessionProps) {
   const router = useRouter();
   const totalSeconds = durationMinutes * 60;
+  const ageBandUI = getAgeBandUI(ageBand);
 
   const [timer, setTimer] = useState<TimerState>({
     phase: "idle",
@@ -86,8 +90,13 @@ export function StudySession({
   const startedAtRef = useRef<number | null>(null);
 
   // Focus-loss tracking via the Page Visibility API.
-  // Counts how many times the tab was hidden while the session was running.
   const focusLossCountRef = useRef(0);
+  const [focusLossCount, setFocusLossCount] = useState(0);
+  const [welcomeBackVisible, setWelcomeBackVisible] = useState(false);
+  const welcomeBackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Strict focus mode (fullscreen).
+  const [strictMode, setStrictMode] = useState(false);
 
   const [missedResult, setMissedResult] = useState<{
     changes: PlanChange[];
@@ -99,9 +108,6 @@ export function StudySession({
   const progressPct = Math.min(100, (elapsed / totalSeconds) * 100);
 
   // Restore timer state from sessionStorage on mount (page-refresh mid-session).
-  // setTimer is in a setTimeout callback to satisfy the set-state-in-effect rule.
-  // Empty deps are safe: sessionId and totalSeconds are URL/prop-derived and
-  // can't change while this component is mounted.
   useEffect(() => {
     const id = setTimeout(() => {
       try {
@@ -174,17 +180,58 @@ export function StudySession({
     return () => clearTimeout(t);
   }, [phase, router]);
 
-  // Visibility API: count tab-hide events while the session is running.
-  // We read focusLossCountRef (not state) so the handler never re-registers.
+  // Visibility API: count tab-hide events and show welcome-back message on return.
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === "hidden") {
         focusLossCountRef.current += 1;
+        setFocusLossCount(focusLossCountRef.current);
+      } else if (document.visibilityState === "visible" && phase === "running") {
+        // Clear any pending timer and show the welcome-back banner for 3 s.
+        if (welcomeBackTimerRef.current) clearTimeout(welcomeBackTimerRef.current);
+        setWelcomeBackVisible(true);
+        welcomeBackTimerRef.current = setTimeout(() => setWelcomeBackVisible(false), 3000);
       }
     };
     document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
-  }, []); // intentionally runs once — reads mutable ref, not state
+    return () => {
+      document.removeEventListener("visibilitychange", handler);
+      if (welcomeBackTimerRef.current) clearTimeout(welcomeBackTimerRef.current);
+    };
+  }, [phase]); // re-register when phase changes so the visible-branch checks the current phase
+
+  // Warn before leaving while a session is actively running.
+  useEffect(() => {
+    if (phase !== "running") return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // returnValue is required for the browser dialog to appear.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [phase]);
+
+  // Fullscreen: enter when strict mode is toggled on, exit on toggle off.
+  useEffect(() => {
+    if (strictMode) {
+      document.documentElement.requestFullscreen?.().catch(() => {
+        // Fullscreen may be blocked (e.g. user denied, iframe) — silently degrade.
+        setStrictMode(false);
+      });
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }, [strictMode]);
+
+  // Sync strict mode state when the user exits fullscreen via Esc or browser UI.
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) setStrictMode(false);
+    };
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -193,6 +240,7 @@ export function StudySession({
   const handleStart = useCallback(() => {
     startedAtRef.current = Date.now();
     focusLossCountRef.current = 0;
+    setFocusLossCount(0);
     setTimer({ phase: "running", elapsed: 0, pausedElapsed: 0 });
     void recordSessionEventAction(sessionId, "started", {});
   }, [sessionId]);
@@ -266,7 +314,7 @@ export function StudySession({
     >
       {/* Back link — hidden during overlays to prevent accidental mid-action navigation */}
       {isStudying && (
-        <header className="px-container-margin pt-stack-md">
+        <header className="px-container-margin pt-stack-md flex items-center justify-between">
           <Link
             href="/today"
             className="inline-flex items-center gap-1 font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors"
@@ -279,12 +327,43 @@ export function StudySession({
             </span>
             Back to today
           </Link>
+
+          {/* Strict Focus Mode toggle — only shown when session has started */}
+          {(phase === "running" || phase === "paused") && (
+            <button
+              type="button"
+              onClick={() => setStrictMode((v) => !v)}
+              title={strictMode ? "Exit strict focus mode" : "Enter strict focus mode (fullscreen)"}
+              className={
+                "inline-flex items-center gap-1 font-label-sm text-label-sm transition-colors px-3 py-1.5 rounded-lg border " +
+                (strictMode
+                  ? "bg-primary-container text-on-primary border-primary/30"
+                  : "text-on-surface-variant border-outline-variant hover:bg-surface-variant")
+              }
+            >
+              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                {strictMode ? "fullscreen_exit" : "fullscreen"}
+              </span>
+              {strictMode ? "Exit fullscreen" : "Focus mode"}
+            </button>
+          )}
         </header>
       )}
 
       {/* Study mode */}
       {isStudying && (
         <main className="flex-grow flex flex-col items-center justify-center px-container-margin gap-stack-md text-center">
+          {/* Welcome-back banner — shown briefly after tab regains visibility */}
+          {welcomeBackVisible && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="bg-secondary-container text-on-secondary-container font-label-md text-label-md px-4 py-2 rounded-lg"
+            >
+              {ageBandUI.welcomeBack}
+            </div>
+          )}
+
           <span className="font-label-sm text-label-sm bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full">
             {subjectName}
           </span>
@@ -318,6 +397,13 @@ export function StudySession({
               style={{ width: `${progressPct}%` }}
             />
           </div>
+
+          {/* Focus-loss indicator — subtle, shown only after the first interruption */}
+          {focusLossCount > 0 && (phase === "running" || phase === "paused") && (
+            <p className="font-label-sm text-label-sm text-outline">
+              {focusLossCount} focus interruption{focusLossCount === 1 ? "" : "s"}
+            </p>
+          )}
 
           {/* Controls */}
           <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
@@ -417,10 +503,10 @@ export function StudySession({
               </span>
               <div>
                 <h1 className="font-headline-lg text-headline-lg text-on-surface mb-2">
-                  Well done!
+                  {ageBandUI.sessionCompleteMessage}
                 </h1>
                 <p className="font-body-lg text-body-lg text-on-surface-variant">
-                  Session marked complete.
+                  {ageBandUI.sessionCompleteSubtitle}
                 </p>
               </div>
               <Link

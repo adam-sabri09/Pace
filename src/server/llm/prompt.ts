@@ -149,6 +149,18 @@ export function buildPrompt(input: PlanInput): string {
           .join("\n")
       : "";
 
+  const calendarBlock =
+    input.calendarBusyPeriods && input.calendarBusyPeriods.length > 0
+      ? "\nGoogle Calendar busy periods (do NOT schedule study sessions during these times):\n" +
+        input.calendarBusyPeriods
+          .map((p) => {
+            const start = utcToLocalParts(new Date(p.startsAt), input.timeZone);
+            const end = utcToLocalParts(new Date(p.endsAt), input.timeZone);
+            return `  - ${start.dateString} ${start.timeString} – ${end.timeString}`;
+          })
+          .join("\n")
+      : "";
+
   return `You are Pace, an adaptive study planner for high-school students.
 Build a realistic, day-by-day study schedule.
 
@@ -165,6 +177,7 @@ ${availabilityBlock}
 ${completedBlock}
 ${tasksBlock}
 ${profileBlock}
+${calendarBlock}
 Rules:
 1. Every session's startsAt is a local wall-clock string in the student's
    timezone, formatted YYYY-MM-DDTHH:MM (no offset, no seconds).
@@ -186,7 +199,9 @@ Rules:
 7. If a topic cannot fit before its deadline given the availability,
    include a warning object with subjectName, topicName, and a short
    message. Never silently drop a topic.
-8. subjectName must exactly match one of the subject names above.
+8. If Google Calendar busy periods are listed above, treat those time ranges as
+   unavailable. Do not schedule sessions that overlap with them.
+9. subjectName must exactly match one of the subject names above.
    topicName must exactly match a topic listed under that subject.
 9. instruction is a short (<= 60 chars) action label for the student,
    e.g. "Review chapter 4", "Practice problems", "Active recall".

@@ -2,10 +2,15 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { submitAnswerAction, endPracticeAction } from "@/server/actions/practice";
+import {
+  submitAnswerAction,
+  endPracticeAction,
+  retryNextQuestionAction,
+} from "@/server/actions/practice";
 import type { ClientQuestion, PracticeSummary } from "@/server/actions/practice";
 import type { Difficulty } from "@/lib/practice/difficulty";
 import { DIFFICULTY_LABELS } from "@/lib/practice/difficulty";
+import { resolveSessionEnd } from "@/lib/practice/session";
 
 type Phase = "question" | "feedback" | "complete";
 
@@ -37,6 +42,7 @@ export function PracticeUI({
   const [feedback, setFeedback] = useState<{ text: string; isCorrect: boolean } | null>(null);
   const [summary, setSummary] = useState<PracticeSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [generationFailed, setGenerationFailed] = useState(false);
   const startTimeRef = useRef<number>(0);
   const MAX_QUESTIONS = 10;
 
@@ -60,7 +66,8 @@ export function PracticeUI({
       if (result.isCorrect) setCorrectCount((c) => c + 1);
       setFeedback({ text: result.feedback, isCorrect: result.isCorrect });
 
-      if (result.sessionComplete || !result.nextQuestion) {
+      const resolution = resolveSessionEnd(result);
+      if (resolution === "complete") {
         setPhase("complete");
         setSummary({
           questionsAnswered: questionsAnswered + 1,
@@ -74,8 +81,13 @@ export function PracticeUI({
         });
       } else {
         setPhase("feedback");
-        // Pre-set the next question so it's ready when student continues.
-        if (result.nextQuestion) {
+        if (resolution === "generation_failed") {
+          // Gemini failed to generate the next question. Stay in feedback so
+          // the student can retry — do NOT show the completion screen.
+          setGenerationFailed(true);
+        } else {
+          setGenerationFailed(false);
+          // Pre-set the next question so it's ready when the student continues.
           setTimeout(() => {
             setQuestion(result.nextQuestion!);
           }, 0);
@@ -100,6 +112,19 @@ export function PracticeUI({
       }
       setSummary(result.summary);
       setPhase("complete");
+    });
+  }
+
+  function handleRetryGeneration() {
+    setError(null);
+    startTransition(async () => {
+      const result = await retryNextQuestionAction(sessionId);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setGenerationFailed(false);
+      setQuestion(result.question);
     });
   }
 
@@ -222,11 +247,24 @@ export function PracticeUI({
                 Your answer: <em className="not-italic text-on-surface">{answer}</em>
               </p>
 
+              {generationFailed && (
+                <p role="alert" className="font-body-sm text-body-sm text-error">
+                  Could not load the next question. Tap &quot;Try again&quot; to continue.
+                </p>
+              )}
+
+              {error && (
+                <p role="alert" className="font-body-sm text-body-sm text-error">
+                  {error}
+                </p>
+              )}
+
               <button
-                onClick={handleContinue}
-                className="self-end bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-full"
+                onClick={generationFailed ? handleRetryGeneration : handleContinue}
+                disabled={isPending}
+                className="self-end bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-full disabled:opacity-50 transition-opacity"
               >
-                Next question
+                {isPending ? "Loading…" : generationFailed ? "Try again" : "Next question"}
               </button>
             </div>
           )}

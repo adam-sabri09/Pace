@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { BottomNav, SideNav, TopAppBar } from "@/components/nav/shell";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminEmail } from "@/lib/auth/admin";
 
 /**
  * Authenticated shell applied to /today, /plan, /subjects, /settings, /admin.
@@ -19,8 +20,7 @@ export default async function AppShellLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Temporarily: all authenticated users have admin access.
-  const isAdmin = true;
+  const isAdmin = isAdminEmail(user.email);
 
   return (
     <div className="min-h-full flex flex-col md:flex-row bg-background text-on-surface">

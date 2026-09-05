@@ -3,19 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-/**
- * Authenticated shell: fixed left side nav on desktop, fixed bottom nav +
- * top app bar on mobile (DESIGN-SPEC.md §2.11–§2.13). Renders four items:
- * Today / Plan / Subjects / Settings. No notifications or search icons
- * per DECISIONS.md D29.
- */
-
 type Item = {
   href: string;
   label: string;
   icon: string;
 };
 
+// All nav items — used in the desktop sidebar (no size limit).
 const ITEMS: Item[] = [
   { href: "/today", label: "Today", icon: "calendar_today" },
   { href: "/plan", label: "Plan", icon: "event_note" },
@@ -24,6 +18,16 @@ const ITEMS: Item[] = [
   { href: "/analytics", label: "Analytics", icon: "insights" },
   { href: "/coach", label: "Coach", icon: "chat" },
   { href: "/settings", label: "Settings", icon: "settings" },
+];
+
+// Subset shown in the mobile bottom nav — 5 max fits on a 375px screen.
+// Settings is accessible via the gear icon in the TopAppBar instead.
+const MOBILE_ITEMS: Item[] = [
+  { href: "/today", label: "Today", icon: "calendar_today" },
+  { href: "/plan", label: "Plan", icon: "event_note" },
+  { href: "/subjects", label: "Subjects", icon: "menu_book" },
+  { href: "/coach", label: "Coach", icon: "chat" },
+  { href: "/coursework", label: "Coursework", icon: "description" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -80,9 +84,30 @@ export function SideNav({ isAdmin }: { isAdmin?: boolean }) {
 }
 
 export function TopAppBar() {
+  const pathname = usePathname();
+  const settingsActive = pathname === "/settings";
   return (
-    <header className="md:hidden fixed top-0 left-0 w-full bg-surface border-b border-outline-variant px-container-margin py-base z-40 flex items-center">
+    <header className="md:hidden fixed top-0 left-0 w-full bg-surface border-b border-outline-variant px-container-margin py-base z-40 flex items-center justify-between">
       <span className="font-display text-headline-md text-primary">Pace</span>
+      <Link
+        href="/settings"
+        aria-label="Settings"
+        aria-current={settingsActive ? "page" : undefined}
+        className={
+          "p-1 rounded-full transition-colors " +
+          (settingsActive
+            ? "text-primary bg-secondary-container"
+            : "text-on-surface-variant hover:bg-surface-container-low")
+        }
+      >
+        <span
+          className="material-symbols-outlined"
+          style={settingsActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+          aria-hidden="true"
+        >
+          settings
+        </span>
+      </Link>
     </header>
   );
 }
@@ -90,8 +115,8 @@ export function TopAppBar() {
 export function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   const pathname = usePathname();
   const items = isAdmin
-    ? [...ITEMS, { href: "/admin", label: "Admin", icon: "admin_panel_settings" }]
-    : ITEMS;
+    ? [...MOBILE_ITEMS, { href: "/admin", label: "Admin", icon: "admin_panel_settings" }]
+    : MOBILE_ITEMS;
   return (
     <nav
       aria-label="Primary"
