@@ -49,7 +49,7 @@ export function CourseworkUploadForm() {
     >
       <h2 className="font-headline-md text-headline-md text-on-surface">Upload study material</h2>
       <p className="font-body-sm text-body-sm text-on-surface-variant">
-        PDF, JPEG, PNG, or plain text · max 5 MB
+        PDF, JPEG, PNG, GIF, or plain text · max 5 MB
       </p>
 
       {/* File picker */}
@@ -63,7 +63,7 @@ export function CourseworkUploadForm() {
         <input
           ref={fileRef}
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.txt"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.txt"
           onChange={handleFileChange}
           className="sr-only"
         />

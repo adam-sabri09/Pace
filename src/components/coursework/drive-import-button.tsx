@@ -76,7 +76,6 @@ export function DriveImportButton({ onImported }: Props) {
     "idle" | "loading-scripts" | "picking" | "downloading" | "error"
   >("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const pickerApiReady = useRef(false);
   const gapiLoaded = useRef(false);
 
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -101,7 +100,11 @@ export function DriveImportButton({ onImported }: Props) {
     });
 
   const openPicker = (accessToken: string) => {
-    if (!window.google?.picker || !window.gapi) return;
+    if (!window.google?.picker || !window.gapi) {
+      setErrorMsg("Google Drive is not ready. Please try again.");
+      setStatus("error");
+      return;
+    }
     const view = new window.google.picker.DocsView().setMimeTypes(ALLOWED_MIME_TYPES);
     const picker = new window.google.picker.PickerBuilder()
       .addView(view)
@@ -148,7 +151,6 @@ export function DriveImportButton({ onImported }: Props) {
       if (!gapiLoaded.current) {
         await new Promise<void>((resolve) =>
           window.gapi!.load("picker", () => {
-            pickerApiReady.current = true;
             gapiLoaded.current = true;
             resolve();
           }),
