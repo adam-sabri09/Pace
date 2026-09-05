@@ -14,7 +14,7 @@ const SECURITY_HEADERS = [
 const nextConfig: NextConfig = {
   // output: 'standalone' creates .next/standalone — the minimal bundle used by the Dockerfile.
   // `npm run dev` and `npm run start` are unaffected.
-  output: "standalone",
+  output: process.env.DOCKER_BUILD === "true" ? "standalone" : undefined,
   async headers() {
     return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },

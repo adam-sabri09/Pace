@@ -207,7 +207,7 @@ export default async function AdminPage() {
             {statsError ?? "Could not load admin stats."}
           </p>
           <p className="font-body-sm text-body-sm text-on-error-container mt-2 opacity-70">
-            Check that NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in the environment.
+            Check that all Supabase environment variables are set in the Vercel dashboard for the Production environment.
           </p>
         </div>
       </div>

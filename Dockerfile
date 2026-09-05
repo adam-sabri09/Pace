@@ -26,6 +26,7 @@ COPY . .
 
 # Disable Next.js telemetry during build.
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV DOCKER_BUILD=true
 
 # Build args become env vars at build time.
 # NEXT_PUBLIC_* vars must be present at build time because Next.js inlines them.

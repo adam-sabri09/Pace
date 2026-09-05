@@ -10,15 +10,13 @@ import { createClient } from "@supabase/supabase-js";
 export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    // Log which variable is missing to help diagnose production incidents.
-    console.error("[createServiceClient] missing env vars:", {
-      hasUrl: !!url,
-      hasKey: !!key,
-    });
-    throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.",
-    );
+  if (!url) {
+    console.error("[createServiceClient] NEXT_PUBLIC_SUPABASE_URL is not set");
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set.");
+  }
+  if (!key) {
+    console.error("[createServiceClient] SUPABASE_SERVICE_ROLE_KEY is not set");
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set.");
   }
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
