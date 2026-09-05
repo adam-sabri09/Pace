@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { logInAction, type AuthActionState } from "@/server/actions/auth";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 /**
  * Login form — Pace visual system (DESIGN-SPEC.md §7).
@@ -81,6 +82,14 @@ export function LoginForm() {
             {pending ? "Signing in…" : "Log In"}
           </button>
         </form>
+
+        <div className="flex items-center gap-3">
+          <span className="flex-1 h-px bg-outline-variant" aria-hidden="true" />
+          <span className="font-label-sm text-label-sm text-outline">or</span>
+          <span className="flex-1 h-px bg-outline-variant" aria-hidden="true" />
+        </div>
+
+        <GoogleSignInButton mode="login" />
 
         <p className="text-center font-label-md text-label-md text-on-surface-variant">
           New to Pace?{" "}

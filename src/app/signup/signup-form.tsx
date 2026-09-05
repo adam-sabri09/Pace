@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { signUpAction, type AuthActionState } from "@/server/actions/auth";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 /**
  * Signup form — Pace visual system (DESIGN-SPEC.md §7 / §2.4 / §2.1).
@@ -132,6 +133,14 @@ export function SignupForm() {
             {pending ? "Creating account…" : "Get Started"}
           </button>
         </form>
+
+        <div className="flex items-center gap-3">
+          <span className="flex-1 h-px bg-outline-variant" aria-hidden="true" />
+          <span className="font-label-sm text-label-sm text-outline">or</span>
+          <span className="flex-1 h-px bg-outline-variant" aria-hidden="true" />
+        </div>
+
+        <GoogleSignInButton mode="signup" />
 
         <p className="text-center font-label-md text-label-md text-on-surface-variant">
           Already have an account?{" "}

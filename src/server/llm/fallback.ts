@@ -221,6 +221,22 @@ export function generateFallbackPlan(input: PlanInput): ValidatedSession[] {
         // Don't schedule past the horizon (exam date).
         if (endsAtUTC.getTime() > localWallClockToUTC(horizonStr + "T23:59", input.timeZone).getTime()) break;
 
+        // Skip slots that overlap a Google Calendar busy period.
+        // All comparisons in UTC to avoid timezone/DST ambiguity.
+        // Advance past the busy period's end and retry — the while-condition
+        // will exit the loop naturally if no slot fits before the window ends.
+        const busyConflict = (input.calendarBusyPeriods ?? []).find((bp) => {
+          const bpStart = new Date(bp.startsAt).getTime();
+          const bpEnd = new Date(bp.endsAt).getTime();
+          return startsAtUTC.getTime() < bpEnd && endsAtUTC.getTime() > bpStart;
+        });
+        if (busyConflict) {
+          const busyEndMs = new Date(busyConflict.endsAt).getTime();
+          // Always advance forward; Math.max guards against malformed busy data.
+          slotMs = Math.max(slotMs + 1, busyEndMs);
+          continue;
+        }
+
         const topic = cycle[topicIdx % cycle.length];
         topicIdx++;
 

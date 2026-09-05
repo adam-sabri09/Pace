@@ -17,6 +17,7 @@ import {
 import { scorePersonalization } from "@/lib/personalization/scoring";
 import type { PersonalizationAnswers } from "@/lib/personalization/types";
 import { logAppError } from "@/lib/errors/log-error";
+import { fetchCalendarBusyPeriods } from "@/server/actions/google-calendar";
 
 /**
  * Plan generation + adaptive re-planning.
@@ -240,6 +241,15 @@ async function buildPlanInput(
 
   if (input.subjects.length === 0) {
     return { ok: false, error: "You need at least one subject to generate a plan." };
+  }
+
+  // Fetch Google Calendar busy periods if the user has connected their account.
+  // Non-fatal: failure returns [] and the plan proceeds without calendar data.
+  const fromISO = new Date().toISOString();
+  const toISO = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(); // 60 days
+  const calendarBusyPeriods = await fetchCalendarBusyPeriods(userId, fromISO, toISO);
+  if (calendarBusyPeriods.length > 0) {
+    input.calendarBusyPeriods = calendarBusyPeriods;
   }
 
   // Pre-flight feasibility: catch impossible constraints (past/today exam

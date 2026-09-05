@@ -13,6 +13,7 @@ import type { PersonalizationAnswers, TechniqueKey } from "@/lib/personalization
 import { selectTechnique, type HybridTechniqueResult } from "@/lib/ml/hybrid";
 import type { TrainingExample } from "@/lib/ml/features";
 import { encodeFeatures } from "@/lib/ml/features";
+import { getAgeBandUI } from "@/lib/personalization/age-band";
 
 /**
  * /today — dashboard for the current local day.
@@ -36,6 +37,7 @@ export default async function TodayPage() {
 
   const timeZone = profile?.time_zone ?? "UTC";
   const greetingName = profile?.first_name?.trim() || "friend";
+  const ageBandUI = getAgeBandUI(profile?.age_band as string | null);
 
   const now = new Date();
   const localNow = utcToLocalParts(now, timeZone);
@@ -366,7 +368,7 @@ export default async function TodayPage() {
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 border-b border-outline-variant pb-stack-sm">
         <div>
           <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">
-            Good day, {greetingName}.
+            {ageBandUI.greeting(greetingName)}
           </h1>
           <p className="font-body-lg text-body-lg text-on-surface-variant mt-1">
             {dateLabel}
