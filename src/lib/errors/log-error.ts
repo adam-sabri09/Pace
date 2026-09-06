@@ -7,10 +7,13 @@ export type AppErrorType =
   | "upload_save"
   | "plan_generation"
   | "replan"
+  | "delete_session"
   | "onboarding"
   | "coursework_upload"
+  | "coursework_difficulty"
   | "drive_import"
   | "practice_evaluation"
+  | "practice_question_generation"
   | "other";
 
 /**

@@ -5,7 +5,6 @@ import "server-only";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
-
 import { createClient } from "@/lib/supabase/server";
 import { logAppError } from "@/lib/errors/log-error";
 
@@ -233,6 +232,64 @@ export async function getCourseworkListAction(): Promise<CourseworkItem[]> {
     extracted: (row.extracted as CourseworkExtracted | null) ?? null,
     createdAt: row.created_at as string,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Update user-selected difficulty (persists to extracted.difficulty)
+// ---------------------------------------------------------------------------
+
+export type UpdateDifficultyResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function updateCourseworkDifficultyAction(
+  itemId: string,
+  difficulty: 1 | 2 | 3,
+): Promise<UpdateDifficultyResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You need to be signed in." };
+
+  const difficultyText: "easy" | "medium" | "hard" =
+    difficulty === 1 ? "easy" : difficulty === 3 ? "hard" : "medium";
+
+  // Fetch the current extracted JSONB so we can update only the difficulty key.
+  const { data: item } = await supabase
+    .from("coursework_items")
+    .select("extracted")
+    .eq("id", itemId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!item) return { ok: false, error: "Item not found." };
+
+  const updated = {
+    ...(item.extracted as Record<string, unknown> ?? {}),
+    difficulty: difficultyText,
+  };
+
+  const { error } = await supabase
+    .from("coursework_items")
+    .update({ extracted: updated })
+    .eq("id", itemId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    await logAppError(
+      "coursework_difficulty",
+      error.message,
+      { code: error.code, itemId },
+      user.id,
+    );
+    return { ok: false, error: "Could not save difficulty. Try again." };
+  }
+
+  // No revalidatePath here — the page does not need a server refresh.
+  // The visual state is owned by the client's useState; this write only
+  // persists the selection so future visits start at the right difficulty.
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------

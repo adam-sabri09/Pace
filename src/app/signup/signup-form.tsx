@@ -54,9 +54,11 @@ export function SignupForm() {
         },
         "expired-callback": () => {
           captchaTokenRef.current = "";
+          setCaptchaError("CAPTCHA expired — please complete it again.");
         },
         "error-callback": () => {
           captchaTokenRef.current = "";
+          setCaptchaError("CAPTCHA error — please try again.");
         },
       });
     };
@@ -73,6 +75,9 @@ export function SignupForm() {
     script.async = true;
     script.defer = true;
     script.onload = renderWidget;
+    script.onerror = () => {
+      setCaptchaError("Could not load the security check. Disable ad blockers and try again.");
+    };
     document.head.appendChild(script);
   }, [siteKey]);
 

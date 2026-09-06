@@ -86,6 +86,20 @@ The subject with the highest priority score becomes the recommendation on the To
 
 A subject with no exam date and a subject whose exam has already passed are treated the same way — low urgency. Past exams do not create artificial pressure.
 
+```mermaid
+flowchart LR
+    D["Difficulty\n─────────\nEasy  → 1\nMedium → 2\nHard  → 3\n(default: 2)"]
+    C["Confidence %\n─────────\n81-100% → 1\n61-80%  → 2\n41-60%  → 3\n21-40%  → 4\n0-20%   → 5\n(default: 2)"]
+    U["Days until exam\n─────────\n>60 days   → 1\n31-60 days → 3\n15-30 days → 5\n8-14 days  → 7\n≤7 days    → 10\nno date/past → 1"]
+
+    D -->|difficulty_weight| P
+    C -->|confidence_inverse| P
+    U -->|urgency| P
+
+    P["priority =\ndifficulty_weight\n× urgency\n× confidence_inverse"]
+    P --> R["Subject with highest score\n→ recommendation on Today page"]
+```
+
 ---
 
 ## Current Behavior

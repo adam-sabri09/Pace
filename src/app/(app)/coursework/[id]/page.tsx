@@ -32,6 +32,12 @@ export default async function CourseworkDetailPage({
 
   const ext = item.extracted;
 
+  function difficultyToInt(d: string | null | undefined): 1 | 2 | 3 {
+    if (d === "easy") return 1;
+    if (d === "hard") return 3;
+    return 2;
+  }
+
   return (
     <main className="w-full max-w-3xl mx-auto px-container-margin py-stack-lg flex flex-col gap-stack-md">
       {/* Back link */}
@@ -46,19 +52,14 @@ export default async function CourseworkDetailPage({
       </Link>
 
       <header className="border-b border-outline-variant pb-stack-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-              {item.title}
-            </h1>
-            {item.subjectName && (
-              <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-                {item.subjectName}
-              </p>
-            )}
-          </div>
-          {item.status === "ready" && (
-            <StartPracticeButton courseworkItemId={item.id} />
+        <div>
+          <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
+            {item.title}
+          </h1>
+          {item.subjectName && (
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1">
+              {item.subjectName}
+            </p>
           )}
         </div>
 
@@ -76,13 +77,6 @@ export default async function CourseworkDetailPage({
 
       {ext && (
         <div className="flex flex-col gap-stack-md">
-          {/* Difficulty badge */}
-          {ext.difficulty && (
-            <p className="font-label-md text-label-md text-on-surface-variant capitalize">
-              Difficulty: {ext.difficulty}
-            </p>
-          )}
-
           {/* Topics */}
           {ext.topics && ext.topics.length > 0 && (
             <section className="flex flex-col gap-3">
@@ -165,7 +159,10 @@ export default async function CourseworkDetailPage({
 
       {item.status === "ready" && (
         <div className="flex justify-center pt-stack-sm">
-          <StartPracticeButton courseworkItemId={item.id} variant="large" />
+          <StartPracticeButton
+            courseworkItemId={item.id}
+            initialDifficulty={difficultyToInt(ext?.difficulty)}
+          />
         </div>
       )}
     </main>

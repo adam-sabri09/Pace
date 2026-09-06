@@ -11,6 +11,7 @@ import {
 import { recordSessionEventAction } from "@/server/actions/events";
 import type { PlanChange, PlanWarning } from "@/server/llm/diff";
 import { getAgeBandUI } from "@/lib/personalization/age-band";
+import { CelebrationEffect } from "@/components/celebration/celebration-effect";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -546,7 +547,7 @@ export function StudySession({
 
       {/* Overlays */}
       {isOverlay && (
-        <div className="flex-grow flex flex-col items-center justify-center px-container-margin gap-stack-md text-center">
+        <div className="relative overflow-hidden flex-grow flex flex-col items-center justify-center px-container-margin gap-stack-md text-center">
           {/* Pending */}
           {(phase === "completing" || phase === "missing") && (
             <>
@@ -576,8 +577,15 @@ export function StudySession({
           {/* Completed */}
           {phase === "completed" && (
             <>
+              <CelebrationEffect style={ageBandUI.celebrationStyle} />
               <span
-                className="material-symbols-outlined text-[64px] text-primary"
+                className={`completion-icon material-symbols-outlined text-primary ${
+                  ageBandUI.celebrationIntensity === "high"
+                    ? "text-[80px]"
+                    : ageBandUI.celebrationIntensity === "minimal"
+                    ? "text-[48px]"
+                    : "text-[64px]"
+                }`}
                 style={{ fontVariationSettings: "'FILL' 1" }}
                 aria-hidden="true"
               >

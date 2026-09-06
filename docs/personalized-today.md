@@ -45,6 +45,27 @@ The subject with the highest score becomes the recommended subject for today. Th
 
 See `docs/subject-intelligence.md` for the full priority formula and `docs/recommendation-decision-logic.md` for the end-to-end flow.
 
+```mermaid
+flowchart TD
+    A(["/today loads"]) --> B{Questionnaire\ncomplete?}
+
+    B -- No --> C["Show personalization CTA banner\n(skippable)"]
+    C --> Z["Render session list only\n(no recommendation card)"]
+
+    B -- Yes --> D["Score 6 answers against 7 techniques\n→ top technique + confidence level"]
+    D --> E["For each subject:\npriority = difficulty_weight\n× urgency × confidence_inverse"]
+    E --> F["Select subject with highest priority"]
+    F --> G["Choose rationale\n(exam soon / hard subject /\nlow confidence / default)"]
+    G --> H{Confidence level}
+
+    H -- High --> I1["Eyebrow: 'Today's focus'\nno extra note"]
+    H -- Medium --> I2["Eyebrow: 'Today's suggestion'\n+ invite to update preferences"]
+    H -- Low --> I3["Eyebrow: 'A starting point'\n+ note that answers improve recommendations"]
+
+    I1 & I2 & I3 --> J["Render recommendation card\nSubject · Technique · Duration · Rationale"]
+    J --> Z
+```
+
 ---
 
 ## The Recommendation Card

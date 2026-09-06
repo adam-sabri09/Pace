@@ -185,3 +185,268 @@ body {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Age-band visual personalities.
+ *
+ * Applied via data-age-band on the app shell root in (app)/layout.tsx.
+ * CSS custom-property overrides cascade through the subtree so every
+ * Tailwind utility that resolves var(--color-*) or var(--radius-*)
+ * automatically picks up the right value per band — no component changes
+ * needed for colours or radius. Senior is the designed baseline and uses
+ * the @theme defaults above unchanged.
+ *
+ * Progression: Junior (vibrant violet) → Intermediate (electric blue)
+ *           → Senior (forest green, default) → University (cool slate)
+ *           → Adult (deep navy)
+ * ─────────────────────────────────────────────────────────────────────── */
+
+[data-age-band="junior"] {
+  /* Vibrant violet/purple — energetic, playful, approachable */
+  --color-primary: #5b21b6;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #7c3aed;
+  --color-on-primary-container: #ede9fe;
+  --color-inverse-primary: #c4b5fd;
+  --color-secondary: #0e7490;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #cffafe;
+  --color-on-secondary-container: #164e63;
+  --color-tertiary: #c2410c;
+  --color-on-tertiary: #ffffff;
+  --color-surface: #fdf8ff;
+  --color-surface-bright: #fdf8ff;
+  --color-background: #fdf8ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f5f3ff;
+  --color-surface-container: #ede9fe;
+  --color-surface-container-high: #ddd6fe;
+  --color-surface-container-highest: #c4b5fd;
+  /* Softer, rounder treatment — more approachable for 11–13 */
+  --radius-xl: 1rem;
+  --radius-full: 1.5rem;
+}
+
+[data-age-band="intermediate"] {
+  /* Vivid blue — engaging, modern, slightly more mature */
+  --color-primary: #1d4ed8;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #2563eb;
+  --color-on-primary-container: #dbeafe;
+  --color-inverse-primary: #93c5fd;
+  --color-secondary: #059669;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #d1fae5;
+  --color-on-secondary-container: #064e3b;
+  --color-tertiary: #7c3aed;
+  --color-on-tertiary: #ffffff;
+  --color-surface: #f8fbff;
+  --color-surface-bright: #f8fbff;
+  --color-background: #f8fbff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eff6ff;
+  --color-surface-container: #e8f0fe;
+  --color-surface-container-high: #dbeafe;
+  --color-surface-container-highest: #bfdbfe;
+  /* Slightly rounder than senior */
+  --radius-xl: 0.625rem;
+}
+
+/* [data-age-band="senior"] — uses the @theme defaults above, no override */
+
+[data-age-band="university"] {
+  /* Cool slate — sophisticated, focused, autonomous */
+  --color-primary: #334155;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #475569;
+  --color-on-primary-container: #f1f5f9;
+  --color-inverse-primary: #94a3b8;
+  --color-secondary: #4f6272;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e2e8f0;
+  --color-on-secondary-container: #1e293b;
+  --color-tertiary: #4338ca;
+  --color-on-tertiary: #ffffff;
+  --color-surface: #f8fafc;
+  --color-surface-bright: #f8fafc;
+  --color-background: #f8fafc;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f1f5f9;
+  --color-surface-container: #e2e8f0;
+  --color-surface-container-high: #cbd5e1;
+  --color-surface-container-highest: #b2bfcc;
+  /* Crisper radius — cleaner, more information-dense */
+  --radius-xl: 0.375rem;
+  --radius-full: 0.5rem;
+}
+
+[data-age-band="adult"] {
+  /* Deep navy — professional, efficient, minimal decoration */
+  --color-primary: #1e3a5f;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #2d5282;
+  --color-on-primary-container: #dbeafe;
+  --color-inverse-primary: #7eb3d4;
+  --color-secondary: #374151;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e5e7eb;
+  --color-on-secondary-container: #111827;
+  --color-tertiary: #1e3799;
+  --color-on-tertiary: #ffffff;
+  --color-surface: #f9fafb;
+  --color-surface-bright: #f9fafb;
+  --color-background: #f9fafb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f3f4f6;
+  --color-surface-container: #e5e7eb;
+  --color-surface-container-high: #d1d5db;
+  --color-surface-container-highest: #b0b9c4;
+  /* Very crisp radius — professional, structured */
+  --radius-xl: 0.25rem;
+  --radius-full: 0.375rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Age-band animations and micro-interactions.
+ *
+ * All animation classes live in markup — the data-age-band selector on the
+ * app shell root activates the correct keyframes per band. Every animation
+ * block is covered by a prefers-reduced-motion override at the end.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Keyframes ──────────────────────────────────────────────────────────── */
+
+@keyframes pace-progress-bouncy {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes pace-progress-smooth {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes pace-badge-pop {
+  0%   { transform: scale(0.55); opacity: 0; }
+  65%  { transform: scale(1.14); }
+  100% { transform: scale(1);    opacity: 1; }
+}
+@keyframes pace-streak-fire {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  30%       { transform: rotate(-7deg) scale(1.1); }
+  70%       { transform: rotate(7deg) scale(1.1); }
+}
+@keyframes pace-slide-up {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes pace-milestone-pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.012); }
+}
+@keyframes pace-icon-pop {
+  0%   { transform: scale(0.45); opacity: 0; }
+  62%  { transform: scale(1.18); }
+  100% { transform: scale(1);    opacity: 1; }
+}
+@keyframes pace-sparkle-fly {
+  0%   { transform: rotate(var(--sparkle-angle, 0deg)) translateX(0)    scale(1.2); opacity: 1; }
+  100% { transform: rotate(var(--sparkle-angle, 0deg)) translateX(90px) scale(0);   opacity: 0; }
+}
+@keyframes pace-free-day-bounce {
+  0%, 100% { transform: translateY(0); }
+  40%       { transform: translateY(-6px); }
+  70%       { transform: translateY(-3px); }
+}
+
+/* ── Progress bar fill ──────────────────────────────────────────────────── */
+
+[data-age-band="junior"] .progress-bar-fill {
+  transform-origin: left center;
+  animation: pace-progress-bouncy 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+[data-age-band="intermediate"] .progress-bar-fill {
+  transform-origin: left center;
+  animation: pace-progress-smooth 0.65s ease-out both;
+}
+
+/* ── Streak badge ───────────────────────────────────────────────────────── */
+
+[data-age-band="junior"] .streak-badge,
+[data-age-band="intermediate"] .streak-badge {
+  animation: pace-badge-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+[data-age-band="junior"] .streak-fire {
+  display: inline-block;
+  animation: pace-streak-fire 2.8s ease-in-out 0.6s infinite;
+}
+
+/* ── Banner entrances ───────────────────────────────────────────────────── */
+
+[data-age-band="junior"] .alldone-banner,
+[data-age-band="intermediate"] .alldone-banner {
+  animation: pace-slide-up 0.4s ease-out both;
+}
+[data-age-band="senior"] .alldone-banner {
+  animation: pace-slide-up 0.25s ease-out both;
+}
+[data-age-band="junior"] .milestone-banner {
+  animation: pace-slide-up 0.4s ease-out both,
+             pace-milestone-pulse 3.5s ease-in-out 1.2s infinite;
+}
+[data-age-band="intermediate"] .milestone-banner {
+  animation: pace-slide-up 0.4s ease-out both;
+}
+
+/* ── Completion icon ────────────────────────────────────────────────────── */
+
+[data-age-band="junior"] .completion-icon,
+[data-age-band="intermediate"] .completion-icon {
+  animation: pace-icon-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+[data-age-band="senior"] .completion-icon {
+  animation: pace-slide-up 0.3s ease-out both;
+}
+
+/* ── Sparkle particles (intermediate celebration) ───────────────────────── */
+
+.pace-sparkle-particle {
+  animation: pace-sparkle-fly 0.75s ease-out var(--sparkle-delay, 0s) both;
+}
+
+/* ── Free-day illustration (junior) ────────────────────────────────────── */
+
+[data-age-band="junior"] .free-day-art {
+  animation: pace-free-day-bounce 3.2s ease-in-out infinite;
+}
+
+/* ── Session card micro-interactions ───────────────────────────────────── */
+
+[data-age-band="junior"] .session-card-wrapper {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+[data-age-band="junior"] .session-card-wrapper:hover {
+  transform: translateY(-2px);
+}
+[data-age-band="intermediate"] .session-card-wrapper {
+  transition: transform 0.14s ease-out;
+}
+[data-age-band="intermediate"] .session-card-wrapper:hover {
+  transform: translateY(-1px);
+}
+
+/* ── Prefers-reduced-motion: strip all pace animations ──────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar-fill,
+  .streak-badge,
+  .streak-fire,
+  .alldone-banner,
+  .milestone-banner,
+  .completion-icon,
+  .pace-sparkle-particle,
+  .free-day-art,
+  .session-card-wrapper {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

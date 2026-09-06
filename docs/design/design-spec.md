@@ -258,6 +258,33 @@ For loading / empty / error states:
 
 For each: source folder, purpose, layout, key elements, actions, responsive/state notes.
 
+```mermaid
+flowchart TD
+    Landing["/ Landing\n(public, nav suppressed)"]
+    Login["/login\n(public, nav suppressed)"]
+    Signup["/signup\n(public, nav suppressed)"]
+    Onboarding["/onboarding\n(auth, no plan yet)\nFocus shell — nav suppressed"]
+    Today["/today\nFull nav shell"]
+    Plan["/plan\nFull nav shell"]
+    Subjects["/subjects\nFull nav shell"]
+    Settings["/settings\nFull nav shell"]
+    Study["/study/[sessionId]\nFocus shell — nav suppressed"]
+
+    Landing -->|"Get Started"| Signup
+    Landing -->|"Log In"| Login
+    Signup -->|"Account created"| Today
+    Login -->|"Authenticated"| Today
+    Today -- "session_length_minutes null\n(auto-redirect)" --> Onboarding
+    Onboarding -->|"Create my plan"| Today
+    Today -->|"Plan tab"| Plan
+    Today -->|"Subjects tab"| Subjects
+    Today -->|"Settings tab"| Settings
+    Today -->|"Open session card"| Study
+    Study -->|"Complete → overlay → Continue"| Today
+    Study -->|"Missed → overlay → Plan Updated"| Today
+    Settings -->|"Delete account → logout"| Landing
+```
+
 ### 3.1 Landing Page — `pace_landing_page`
 - **Purpose**: public entry, explain the product, drive signup.
 - **Layout**: max-width 1024px centered. Sticky nav (logo + "Method" / "Log In" / "Get Started"). Hero (display headline + body + two CTAs). Product preview bento block (16:9). "Quiet Mentor Methodology" 4-column grid: Plan / Study / Complete-Miss / Adapt (step 04 highlighted with left accent). Final CTA card. Footer (Privacy / Terms / Support).

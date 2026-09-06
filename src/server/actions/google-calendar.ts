@@ -191,10 +191,10 @@ export async function fetchCalendarBusyPeriods(
   fromISO: string,
   toISO: string,
 ): Promise<CalendarBusyPeriod[]> {
-  const accessToken = await getValidAccessToken(userId);
-  if (!accessToken) return [];
-
   try {
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) return [];
+
     const res = await fetch(
       "https://www.googleapis.com/calendar/v3/freeBusy",
       {

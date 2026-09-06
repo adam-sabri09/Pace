@@ -48,6 +48,34 @@ export async function deletePassedExamsAction(): Promise<DeletePassedExamsResult
   if (fetchError) return { ok: false, error: "Could not fetch past exams." };
   if (!passedSubjects || passedSubjects.length === 0) return { ok: true, count: 0 };
 
+  const passedSubjectIds = passedSubjects.map((s) => s.id as string);
+
+  // Delete missed sessions for topics belonging to the cleared subjects.
+  // Only deletes sessions that have already started (status=missed, starts_at < now).
+  // Completed sessions and scheduled future sessions are preserved.
+  const { data: affectedTopics, error: topicsError } = await supabase
+    .from("topics")
+    .select("id")
+    .in("subject_id", passedSubjectIds)
+    .eq("user_id", user.id);
+
+  if (topicsError) return { ok: false, error: "Could not fetch topics for past exams." };
+
+  const topicIds = (affectedTopics ?? []).map((t) => t.id as string);
+
+  if (topicIds.length > 0) {
+    const nowISO = new Date().toISOString();
+    const { error: sessionsError } = await supabase
+      .from("sessions")
+      .delete()
+      .eq("user_id", user.id)
+      .in("status", ["missed", "scheduled"])
+      .lt("starts_at", nowISO)
+      .in("topic_id", topicIds);
+
+    if (sessionsError) return { ok: false, error: "Could not remove missed sessions. Try again." };
+  }
+
   const { error: updateError } = await supabase
     .from("subjects")
     .update({ exam_date: null })
@@ -61,6 +89,34 @@ export async function deletePassedExamsAction(): Promise<DeletePassedExamsResult
   revalidatePath("/today");
 
   return { ok: true, count: passedSubjects.length };
+}
+
+export type DeleteSubjectResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Permanently deletes a subject and all cascaded data (topics, sessions,
+ * practice history tied to those topics). This is irreversible — the caller
+ * must show a confirmation with a data-loss warning before invoking.
+ */
+export async function deleteSubjectAction(subjectId: string): Promise<DeleteSubjectResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You need to be signed in." };
+
+  const { error } = await supabase
+    .from("subjects")
+    .delete()
+    .eq("id", subjectId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, error: "Could not delete the subject. Try again." };
+
+  revalidatePath("/subjects");
+  revalidatePath("/plan");
+  revalidatePath("/today");
+  return { ok: true };
 }
 
 export type AddSubjectResult = { ok: true } | { ok: false; error: string };
@@ -113,5 +169,7 @@ export async function addSubjectAction(raw: unknown): Promise<AddSubjectResult> 
   }
 
   revalidatePath("/subjects");
+  revalidatePath("/plan");
+  revalidatePath("/today");
   return { ok: true };
 }

@@ -118,6 +118,40 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000      # or your production URL
 | Drive import | Short-lived access token (browser, never persisted) | Never stored |
 | Calendar scheduling | Server OAuth flow → `google_connections` table | Refresh token in DB |
 
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant N as Next.js (server)
+    participant S as Supabase Auth
+    participant G as Google OAuth
+
+    rect rgb(230, 240, 255)
+        Note over B,G: Google Sign-In — Supabase-managed
+        B->>N: Click "Sign in with Google"
+        N->>S: signInWithOAuth({ provider: 'google' })
+        S-->>B: 302 → Google consent screen
+        B->>G: User grants access
+        G-->>S: Callback with auth code
+        S->>G: Exchange code for tokens
+        S-->>N: Supabase session JWT (via cookie)
+        N-->>B: Set-Cookie; redirect /today
+    end
+
+    rect rgb(230, 255, 235)
+        Note over B,G: Google Calendar OAuth — server-managed
+        B->>N: Click "Connect Google Calendar"
+        N-->>B: 302 → Google (scope: calendar.readonly)
+        B->>G: User grants access
+        G-->>N: GET /api/google/calendar/callback?code=…
+        N->>G: POST /token — exchange code
+        G-->>N: access_token + refresh_token
+        N->>N: INSERT google_connections (refresh_token)
+        N-->>B: redirect /settings (connected)
+    end
+
+    Note over B,N: Drive import uses a short-lived browser token<br/>from Google Identity Services — never sent to the server.
+```
+
 ---
 
 ## Local dev notes
