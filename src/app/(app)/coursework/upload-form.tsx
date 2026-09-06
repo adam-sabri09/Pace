@@ -51,6 +51,9 @@ export function CourseworkUploadForm() {
       <p className="font-body-sm text-body-sm text-on-surface-variant">
         PDF, JPEG, PNG, GIF, or plain text · max 5 MB
       </p>
+      <p className="font-body-sm text-body-sm text-on-surface-variant">
+        Your file is sent to Google Gemini for processing and is not stored after extraction.
+      </p>
 
       {/* File picker */}
       <label className="flex items-center gap-3 cursor-pointer">

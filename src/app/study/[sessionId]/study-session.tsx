@@ -104,6 +104,11 @@ export function StudySession({
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Tracks whether we've already registered a focus-loss for the current
+  // "away" episode to avoid double-counting visibilitychange + window blur.
+  const awayRef = useRef(false);
+  const [strictFocusLost, setStrictFocusLost] = useState(false);
+
   const remaining = Math.max(0, totalSeconds - elapsed);
   const progressPct = Math.min(100, (elapsed / totalSeconds) * 100);
 
@@ -180,25 +185,54 @@ export function StudySession({
     return () => clearTimeout(t);
   }, [phase, router]);
 
-  // Visibility API: count tab-hide events and show welcome-back message on return.
+  // Unified focus-loss tracker: covers both tab switches (visibilitychange) and
+  // switching to another app entirely (window blur/focus).
+  // A single "away episode" is counted once regardless of which API fires first.
   useEffect(() => {
-    const handler = () => {
-      if (document.visibilityState === "hidden") {
-        focusLossCountRef.current += 1;
-        setFocusLossCount(focusLossCountRef.current);
-      } else if (document.visibilityState === "visible" && phase === "running") {
-        // Clear any pending timer and show the welcome-back banner for 3 s.
+    const onAway = () => {
+      if (awayRef.current) return; // already counted this episode
+      awayRef.current = true;
+      focusLossCountRef.current += 1;
+      setFocusLossCount(focusLossCountRef.current);
+
+      if (strictMode && phase === "running") {
+        // Auto-pause so elapsed = real study time, not wall-clock time away.
+        const acc =
+          startedAtRef.current !== null
+            ? pausedElapsed + (Date.now() - startedAtRef.current) / 1000
+            : pausedElapsed;
+        startedAtRef.current = null;
+        setTimer({ phase: "paused", elapsed: acc, pausedElapsed: acc });
+        setStrictFocusLost(true);
+      }
+    };
+
+    const onBack = () => {
+      if (!awayRef.current) return;
+      awayRef.current = false;
+
+      if (phase === "running" && !strictMode) {
         if (welcomeBackTimerRef.current) clearTimeout(welcomeBackTimerRef.current);
         setWelcomeBackVisible(true);
         welcomeBackTimerRef.current = setTimeout(() => setWelcomeBackVisible(false), 3000);
       }
     };
-    document.addEventListener("visibilitychange", handler);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") onAway();
+      else onBack();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", onAway);
+    window.addEventListener("focus", onBack);
     return () => {
-      document.removeEventListener("visibilitychange", handler);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", onAway);
+      window.removeEventListener("focus", onBack);
       if (welcomeBackTimerRef.current) clearTimeout(welcomeBackTimerRef.current);
     };
-  }, [phase]); // re-register when phase changes so the visible-branch checks the current phase
+  }, [phase, strictMode, pausedElapsed]);
 
   // Warn before leaving while a session is actively running.
   useEffect(() => {
@@ -315,18 +349,28 @@ export function StudySession({
       {/* Back link — hidden during overlays to prevent accidental mid-action navigation */}
       {isStudying && (
         <header className="px-container-margin pt-stack-md flex items-center justify-between">
-          <Link
-            href="/today"
-            className="inline-flex items-center gap-1 font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors"
-          >
-            <span
-              className="material-symbols-outlined text-[18px]"
-              aria-hidden="true"
+          {phase === "idle" ? (
+            <Link
+              href="/today"
+              className="inline-flex items-center gap-1 font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors"
             >
-              arrow_back
-            </span>
-            Back to today
-          </Link>
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
+              Back to today
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Leave this session? Your progress will not be saved as complete.")) {
+                  router.push("/today");
+                }
+              }}
+              className="inline-flex items-center gap-1 font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
+              Back to today
+            </button>
+          )}
 
           {/* Strict Focus Mode toggle — only shown when session has started */}
           {(phase === "running" || phase === "paused") && (
@@ -353,15 +397,49 @@ export function StudySession({
       {/* Study mode */}
       {isStudying && (
         <main className="flex-grow flex flex-col items-center justify-center px-container-margin gap-stack-md text-center">
-          {/* Welcome-back banner — shown briefly after tab regains visibility */}
-          {welcomeBackVisible && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="bg-secondary-container text-on-secondary-container font-label-md text-label-md px-4 py-2 rounded-lg"
-            >
-              {ageBandUI.welcomeBack}
+          {/* Strict-mode focus-lost overlay — shown when user left during strict mode */}
+          {strictFocusLost ? (
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface/95 backdrop-blur-sm gap-stack-md text-center px-container-margin">
+              <span
+                className="material-symbols-outlined text-[64px] text-tertiary"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+                aria-hidden="true"
+              >
+                visibility_off
+              </span>
+              <div>
+                <h2 className="font-headline-md text-headline-md text-on-surface mb-2">
+                  You left the session
+                </h2>
+                <p className="font-body-md text-body-md text-on-surface-variant max-w-xs">
+                  The timer was paused. Resume when you&rsquo;re ready to focus.
+                </p>
+                <p className="font-label-sm text-label-sm text-outline mt-2">
+                  {focusLossCount} interruption{focusLossCount === 1 ? "" : "s"} so far
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStrictFocusLost(false);
+                  handleResume();
+                }}
+                className="bg-primary text-on-primary font-label-md text-label-md px-8 py-3 rounded-xl hover:opacity-90 transition-opacity"
+              >
+                Resume session
+              </button>
             </div>
+          ) : (
+            /* Welcome-back banner — shown briefly after tab regains visibility (non-strict) */
+            welcomeBackVisible && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="bg-secondary-container text-on-secondary-container font-label-md text-label-md px-4 py-2 rounded-lg"
+              >
+                {ageBandUI.welcomeBack}
+              </div>
+            )
           )}
 
           <span className="font-label-sm text-label-sm bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full">
@@ -372,7 +450,11 @@ export function StudySession({
             <h1 className="font-headline-lg text-headline-lg text-on-surface mb-2">
               {topicName}
             </h1>
-            <p className="font-body-lg text-body-lg text-on-surface-variant">
+            <p className={
+              ageBandUI.uiDensity === "simple"
+                ? "font-body-lg text-body-lg text-on-surface-variant"
+                : "font-body-md text-body-md text-on-surface-variant"
+            }>
               {instruction}
             </p>
           </div>

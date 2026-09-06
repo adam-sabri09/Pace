@@ -6,6 +6,7 @@ import { logOutAction } from "@/server/actions/auth";
 import { getGoogleCalendarStatusAction } from "@/server/actions/google-calendar";
 import { AvailabilityEditor } from "./availability-editor";
 import { GoogleCalendarSection } from "./google-calendar-section";
+import { DeleteAccountSection } from "./delete-account-section";
 import type { SessionLength } from "@/lib/validation/onboarding";
 
 /**
@@ -134,21 +135,14 @@ export default async function SettingsPage({
         </form>
       </section>
 
-      <section className="border border-outline-variant rounded-xl p-stack-md bg-surface-container-lowest opacity-60">
+      <section className="border border-outline-variant rounded-xl p-stack-md bg-surface-container-lowest">
         <h2 className="font-headline-md text-headline-md text-on-surface flex items-center gap-base border-b border-outline-variant pb-base mb-stack-md">
           <span className="material-symbols-outlined text-outline" aria-hidden="true">
             delete_forever
           </span>
           Danger zone
         </h2>
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          className="font-label-md text-label-md text-error border border-outline-variant px-6 py-2 rounded-lg cursor-not-allowed"
-        >
-          Delete account (coming soon)
-        </button>
+        <DeleteAccountSection />
       </section>
     </main>
   );

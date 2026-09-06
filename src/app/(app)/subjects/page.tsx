@@ -57,7 +57,7 @@ export default async function SubjectsPage() {
                   </h2>
                   <span className="font-label-sm text-label-sm bg-secondary-container text-on-secondary-container px-2 py-1 rounded shrink-0">
                     {s.exam_date
-                      ? `Exam ${s.exam_date as string}`
+                      ? `Exam ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${s.exam_date as string}T00:00:00Z`))}`
                       : "No exam date"}
                   </span>
                 </div>
@@ -98,7 +98,7 @@ export default async function SubjectsPage() {
             No subjects yet
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-sm">
-            Finish onboarding to add your subjects.
+            Use the form above to add your first subject.
           </p>
         </div>
       )}

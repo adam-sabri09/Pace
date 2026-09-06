@@ -118,8 +118,8 @@ export async function extractScheduleAction(formData: FormData): Promise<OcrResu
       model,
       schema: OcrRawSchema,
       messages: [{ role: "user", content: contentParts }],
-      // Do not retry: quota and auth errors are definitive.
       maxRetries: 0,
+      abortSignal: AbortSignal.timeout(60_000),
     });
 
     return {

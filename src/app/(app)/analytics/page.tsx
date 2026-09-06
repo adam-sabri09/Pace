@@ -14,10 +14,11 @@ export default async function AnalyticsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("session_length_minutes")
+    .select("session_length_minutes, time_zone")
     .eq("id", user.id)
     .maybeSingle();
   if (profile?.session_length_minutes == null) redirect("/onboarding");
+  const timeZone = (profile?.time_zone as string | null) ?? "UTC";
 
   const [practiceSessionsRes, practiceAttemptsRes, masteryRes, topicsRes] = await Promise.all([
     supabase
@@ -70,18 +71,19 @@ export default async function AnalyticsPage() {
       ? Math.round(timesMs.reduce((a, b) => a + b, 0) / timesMs.length / 1000)
       : null;
 
-  // Practice streak — consecutive calendar days with at least one attempt
+  // Practice streak — consecutive calendar days with at least one attempt, in the user's timezone
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone });
   const daysSeen = new Set(
-    attempts.map((a) => (a.created_at as string).slice(0, 10)),
+    attempts.map((a) => fmt.format(new Date(a.created_at as string))),
   );
   let streak = 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = fmt.format(new Date());
   let cursor = today;
   while (daysSeen.has(cursor)) {
     streak++;
-    const d = new Date(cursor);
-    d.setDate(d.getDate() - 1);
-    cursor = d.toISOString().slice(0, 10);
+    const d = new Date(`${cursor}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 1);
+    cursor = fmt.format(d);
   }
 
   // Mastery — strongest and weakest

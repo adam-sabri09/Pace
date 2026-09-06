@@ -47,6 +47,8 @@ export async function suggestTopicsAction(
       model,
       schema: SuggestionsOutputSchema,
       prompt: buildPrompt(names),
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(20_000),
     });
 
     const result: Record<string, string[]> = {};

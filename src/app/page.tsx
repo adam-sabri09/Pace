@@ -1,43 +1,40 @@
 import Link from "next/link";
+import { WaitlistForm } from "./waitlist-form";
 
-/*
- * Landing page — reproduces DESIGN-SPEC.md §3.1 in the Pace visual system.
- * Static only. No auth, no dynamic data. `/login` and `/signup` are not implemented yet
- * (Phase 4 Step 2) — the links here will 404 until that lands. That is expected.
- */
 export default function LandingPage() {
   return (
     <div className="min-h-full flex flex-col bg-background text-on-surface">
-      {/* Navbar — Minimalist structural clarity. */}
-      <nav className="w-full flex justify-between items-center px-container-margin py-stack-md max-w-[1024px] mx-auto sticky top-0 bg-background/90 backdrop-blur-sm z-40 border-b border-outline-variant/30">
-        <div className="font-display text-display text-primary flex items-center gap-2">
+      {/* Navbar */}
+      <nav className="w-full sticky top-0 bg-background/90 backdrop-blur-sm z-40 border-b border-outline-variant/30">
+        <div className="max-w-[1024px] mx-auto px-container-margin py-stack-md flex justify-between items-center">
           <span className="font-display text-headline-md text-primary">Pace</span>
-        </div>
-        <div className="hidden md:flex gap-8 items-center">
-          <a
-            className="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors"
-            href="#method"
-          >
-            Method
-          </a>
-          <Link
-            className="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors"
-            href="/login"
-          >
-            Log In
-          </Link>
-          <Link
-            className="bg-primary-container text-on-primary font-label-md text-label-md px-6 py-2 rounded-lg hover:opacity-90 transition-opacity"
-            href="/signup"
-          >
-            Get Started
-          </Link>
+          <div className="flex items-center gap-3 md:gap-8">
+            <a
+              className="hidden md:inline font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors"
+              href="#method"
+            >
+              Method
+            </a>
+            <Link
+              className="hidden md:inline font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors"
+              href="/login"
+            >
+              Log In
+            </Link>
+            <Link
+              className="bg-primary-container text-on-primary font-label-md text-label-md px-5 py-2 rounded-lg hover:opacity-90 transition-opacity text-sm"
+              href="/signup"
+            >
+              Get Started
+            </Link>
+          </div>
         </div>
       </nav>
 
-      {/* Main content canvas. */}
+      {/* Main content */}
       <main className="flex-grow w-full max-w-[1024px] mx-auto px-container-margin pt-stack-lg md:pt-20 pb-stack-lg">
-        {/* Hero — high visual density, centered intent. */}
+
+        {/* Hero */}
         <section className="text-center max-w-3xl mx-auto flex flex-col gap-stack-md mb-stack-lg md:mb-32">
           <h1 className="font-display text-display md:text-5xl text-on-surface leading-tight">
             Your study plan that adapts when life doesn&rsquo;t.
@@ -62,63 +59,55 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Product preview placeholder — bento tonal block. */}
+        {/* Product preview */}
         <section
-  aria-label="Pace dashboard preview"
-  className="relative w-full aspect-[16/9] md:aspect-[21/9] bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden mb-stack-lg md:mb-32 p-6 md:p-8"
->
-  <div className="h-full rounded-lg border border-outline-variant bg-background p-4 md:p-6">
-    <div className="flex items-center justify-between mb-6">
-      <div>
-        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
-          Today
-        </p>
-        <h3 className="font-headline-md text-headline-md text-on-surface mt-1">
-          Your study day, organised
-        </h3>
-      </div>
-      <span className="rounded-full bg-secondary-container px-3 py-1 font-label-sm text-label-sm text-on-secondary-container">
-        On track
-      </span>
-    </div>
+          aria-label="Pace dashboard preview"
+          className="relative w-full aspect-[16/9] md:aspect-[21/9] bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden mb-stack-lg md:mb-32 p-6 md:p-8"
+        >
+          <div className="h-full rounded-lg border border-outline-variant bg-background p-4 md:p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+                  Today
+                </p>
+                <h3 className="font-headline-md text-headline-md text-on-surface mt-1">
+                  Your study day, organised
+                </h3>
+              </div>
+              <span className="rounded-full bg-secondary-container px-3 py-1 font-label-sm text-label-sm text-on-secondary-container">
+                On track
+              </span>
+            </div>
 
-    <div className="space-y-3">
-      <div className="rounded-lg border border-outline-variant p-4 flex items-center justify-between">
-        <div>
-          <p className="font-label-md text-label-md text-on-surface">Mathematics</p>
-          <p className="font-body-md text-body-md text-on-surface-variant">
-            Algebra · 45 min
-          </p>
-        </div>
-        <span className="text-label-sm text-on-surface-variant">16:00</span>
-      </div>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-outline-variant p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-label-md text-label-md text-on-surface">Mathematics</p>
+                  <p className="font-body-md text-body-md text-on-surface-variant">Algebra · 45 min</p>
+                </div>
+                <span className="text-label-sm text-on-surface-variant">16:00</span>
+              </div>
 
-      <div className="rounded-lg border border-outline-variant p-4 flex items-center justify-between">
-        <div>
-          <p className="font-label-md text-label-md text-on-surface">Physics</p>
-          <p className="font-body-md text-body-md text-on-surface-variant">
-            Mechanics · 45 min
-          </p>
-        </div>
-        <span className="text-label-sm text-on-surface-variant">17:00</span>
-      </div>
+              <div className="rounded-lg border border-outline-variant p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-label-md text-label-md text-on-surface">Physics</p>
+                  <p className="font-body-md text-body-md text-on-surface-variant">Mechanics · 45 min</p>
+                </div>
+                <span className="text-label-sm text-on-surface-variant">17:00</span>
+              </div>
 
-      <div className="rounded-lg border border-primary-container/40 bg-primary-container/10 p-4 flex items-center justify-between">
-        <div>
-          <p className="font-label-md text-label-md text-on-surface">
-            Biology
-          </p>
-          <p className="font-body-md text-body-md text-on-surface-variant">
-            Cellular respiration · 25 min
-          </p>
-        </div>
-        <span className="text-label-sm text-primary">19:00</span>
-      </div>
-    </div>
-  </div>
-</section>
+              <div className="rounded-lg border border-primary-container/40 bg-primary-container/10 p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-label-md text-label-md text-on-surface">Biology</p>
+                  <p className="font-body-md text-body-md text-on-surface-variant">Cellular respiration · 25 min</p>
+                </div>
+                <span className="text-label-sm text-primary">19:00</span>
+              </div>
+            </div>
+          </div>
+        </section>
 
-        {/* Method grid — structural clarity, typography-driven. */}
+        {/* Method grid */}
         <section id="method" className="mb-stack-lg md:mb-32 scroll-mt-24">
           <div className="text-center mb-16">
             <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
@@ -168,32 +157,44 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Final CTA. */}
+        {/* Final CTA */}
         <section className="bg-surface-container-low border border-outline-variant/50 rounded-xl p-stack-lg text-center flex flex-col items-center justify-center gap-6 my-stack-lg">
           <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface max-w-lg">
             Ready to take control of your studies?
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Join Pace and let the system handle the planning.
+            Sign up now, or drop your email and we&rsquo;ll keep you posted.
           </p>
           <Link
-            className="bg-primary-container text-on-primary font-label-md text-label-md px-10 py-4 rounded-lg hover:opacity-90 transition-opacity mt-4 shadow-sm"
+            className="bg-primary-container text-on-primary font-label-md text-label-md px-10 py-4 rounded-lg hover:opacity-90 transition-opacity shadow-sm"
             href="/signup"
           >
             Start Planning Now
           </Link>
+          <div className="flex items-center gap-3 w-full max-w-sm">
+            <span className="flex-1 h-px bg-outline-variant" />
+            <span className="font-label-sm text-label-sm text-outline">or</span>
+            <span className="flex-1 h-px bg-outline-variant" />
+          </div>
+          <WaitlistForm />
         </section>
       </main>
 
-      {/* Footer. */}
-      <footer className="w-full max-w-[1024px] mx-auto py-stack-lg flex flex-col items-center gap-stack-sm text-center border-t border-outline-variant bg-surface mt-auto">
-        <div className="font-display text-headline-md text-primary mb-2">Pace</div>
-        <p className="font-label-sm text-label-sm text-on-surface-variant mb-2">
-          Pace collects only what it needs to build your plan. No ads. No tracking. No sharing.
-        </p>
-        <p className="font-body-md text-body-md text-on-surface-variant">
-          © 2026 Pace. Academic pressure, managed.
-        </p>
+      {/* Footer — full-width background */}
+      <footer className="w-full bg-surface border-t border-outline-variant mt-auto">
+        <div className="max-w-[1024px] mx-auto px-container-margin py-stack-lg flex flex-col items-center gap-stack-sm text-center">
+          <div className="font-display text-headline-md text-primary mb-2">Pace</div>
+          <p className="font-label-sm text-label-sm text-on-surface-variant mb-2">
+            Pace collects only what it needs to build your plan. No ads. No tracking. No sharing.
+          </p>
+          <div className="flex gap-4 mb-2">
+            <Link href="/privacy" className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary">Privacy</Link>
+            <Link href="/terms" className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary">Terms</Link>
+          </div>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            © 2026 Pace. Academic pressure, managed.
+          </p>
+        </div>
       </footer>
     </div>
   );

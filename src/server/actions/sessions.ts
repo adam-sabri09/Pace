@@ -158,8 +158,8 @@ export async function markDoneAction(
     },
   });
 
-  revalidatePath("/today");
-  revalidatePath("/plan");
+  // Do not revalidatePath here. The client refreshes after the user submits
+  // or skips the confidence feedback panel, so the panel stays visible.
   return { ok: true };
 }
 
@@ -242,4 +242,28 @@ export async function markMissedAction(
   revalidatePath("/today");
   revalidatePath("/plan");
   return { ok: true, changes: replan.changes, warnings: replan.warnings };
+}
+
+export async function submitFeedbackAction(
+  sessionId: string,
+  confidence: number,
+): Promise<{ ok: boolean }> {
+  const parsed = SessionIdSchema.safeParse({ sessionId });
+  if (!parsed.success) return { ok: false };
+  if (confidence < 1 || confidence > 5) return { ok: false };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false };
+
+  await supabase
+    .from("sessions")
+    .update({ feedback_confidence: confidence })
+    .eq("id", parsed.data.sessionId)
+    .eq("user_id", user.id)
+    .eq("status", "completed");
+
+  return { ok: true };
 }

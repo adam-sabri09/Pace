@@ -8,6 +8,24 @@ import { createClient } from "@/lib/supabase/server";
 import { friendlyAuthError } from "@/lib/auth/errors";
 import { LogInSchema, SignUpSchema } from "@/lib/validation/auth";
 
+// Known disposable / throwaway email domains. Intentionally short — blocking
+// too aggressively harms legitimate users. Extend conservatively.
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  "mailinator.com", "guerrillamail.com", "guerrillamail.net", "guerrillamail.org",
+  "guerrillamail.info", "guerrillamail.biz", "guerrillamail.de",
+  "tempmail.com", "temp-mail.org", "throwaway.email", "dispostable.com",
+  "yopmail.com", "trashmail.com", "trashmail.net", "trashmail.at", "trashmail.io",
+  "maildrop.cc", "sharklasers.com", "spam4.me", "discard.email",
+  "fakeinbox.com", "mailnull.com", "crap.email", "pokemail.net",
+  "10minutemail.com", "10minutemail.net", "10minutemail.org",
+  "mailnesia.com", "throwam.com",
+]);
+
+function isDisposableEmail(email: string): boolean {
+  const domain = email.split("@")[1]?.toLowerCase();
+  return domain ? DISPOSABLE_EMAIL_DOMAINS.has(domain) : false;
+}
+
 /**
  * Server actions for the auth surface.
  *
@@ -34,6 +52,7 @@ export async function signUpAction(
     password: formData.get("password"),
     ageConfirmed13Plus: formData.get("ageConfirmed13Plus") === "on",
     timeZone: (formData.get("timeZone") as string | null) ?? "UTC",
+    captchaToken: (formData.get("captchaToken") as string | null) ?? "",
   });
 
   if (!parsed.success) {
@@ -41,15 +60,26 @@ export async function signUpAction(
     return { ok: false, error: first.message };
   }
 
-  const { firstName, email, password, timeZone } = parsed.data;
+  const { firstName, email, password, timeZone, captchaToken } = parsed.data;
+
+  if (isDisposableEmail(email)) {
+    return { ok: false, error: "Please use a real email address to create an account." };
+  }
+
   const supabase = await createClient();
 
   // 1. Create the auth.users row. With email confirmations disabled at the
   //    project level (DECISIONS: prototype, B-i), signUp establishes a session
   //    immediately and the on_auth_user_created trigger seeds the profiles row.
+  //    captchaToken is forwarded to Supabase, which verifies it server-side
+  //    against the hCaptcha secret configured in the Auth dashboard. If the
+  //    secret is set and the token is absent or invalid, Supabase rejects signUp.
   const { data: signUpResult, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      captchaToken: captchaToken || undefined,
+    },
   });
 
   if (signUpError) {
@@ -139,4 +169,87 @@ export async function logOutAction(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+// -----------------------------------------------------------------------------
+// requestPasswordReset — sends a Supabase password-reset email.
+// Always returns { ok: true, sent: true } regardless of whether the email
+// exists — never reveal which addresses are registered.
+// Requires Supabase Auth SMTP to be configured (see dashboard config below).
+// -----------------------------------------------------------------------------
+
+export type RequestResetState =
+  | { ok: true; sent: true }
+  | { ok: false; error: string }
+  | null;
+
+export async function requestPasswordResetAction(
+  _prev: RequestResetState,
+  formData: FormData,
+): Promise<RequestResetState> {
+  const raw = formData.get("email");
+  if (typeof raw !== "string" || !raw.trim()) {
+    return { ok: false, error: "Please enter your email address." };
+  }
+
+  const email = raw.trim().toLowerCase();
+  if (!email.includes("@") || email.length > 320) {
+    return { ok: false, error: "Please enter a valid email address." };
+  }
+
+  const supabase = await createClient();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://pace-io.vercel.app";
+
+  // Fire-and-forget — we do not inspect the error to avoid confirming whether
+  // the email is registered. The same UI message is shown either way.
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/auth/confirm`,
+  });
+
+  return { ok: true, sent: true };
+}
+
+// -----------------------------------------------------------------------------
+// updatePassword — sets a new password inside a Supabase recovery session.
+// The user arrives here after clicking the email link → /auth/confirm → /reset-password.
+// -----------------------------------------------------------------------------
+
+export type UpdatePasswordState = { ok: false; error: string } | null;
+
+export async function updatePasswordAction(
+  _prev: UpdatePasswordState,
+  formData: FormData,
+): Promise<UpdatePasswordState> {
+  const password = formData.get("password");
+  const confirm = formData.get("confirm_password");
+
+  if (typeof password !== "string" || password.length < 8) {
+    return { ok: false, error: "Password must be at least 8 characters." };
+  }
+  if (password !== confirm) {
+    return { ok: false, error: "Passwords don't match. Please try again." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      ok: false,
+      error: "Your reset link has expired. Please request a new one.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    return {
+      ok: false,
+      error:
+        "Could not update your password. Your link may have expired — request a new one.",
+    };
+  }
+
+  redirect("/today");
 }

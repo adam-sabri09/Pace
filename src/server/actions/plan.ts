@@ -378,31 +378,21 @@ export async function rePlanForUser(
   const generated = await generatePlan(input);
   if (!generated.ok) return generated;
 
-  // 5. Swap sessions: delete ALL scheduled (past + future), insert the new
-  //    future ones under the same plan. Completed and missed stay untouched.
-  const { error: delErr } = await supabase
-    .from("sessions")
-    .delete()
-    .eq("user_id", userId)
-    .eq("status", "scheduled");
-  if (delErr) {
-    return { ok: false, error: "Could not update your schedule. Try again." };
-  }
-
+  // 5. Swap sessions atomically via RPC — delete ALL scheduled then insert
+  //    replacements in a single PL/pgSQL block. Completed/missed stay untouched.
   const sessionsPayload = generated.sessions.map((s) => ({
-    plan_id: planId,
-    user_id: userId,
     topic_id: s.topicId,
     starts_at: s.startsAtUTC.toISOString(),
     duration_minutes: s.durationMinutes,
     instruction: s.instruction,
-    status: "scheduled" as const,
   }));
-  if (sessionsPayload.length > 0) {
-    const { error: insErr } = await supabase.from("sessions").insert(sessionsPayload);
-    if (insErr) {
-      return { ok: false, error: "Could not save your updated schedule. Try again." };
-    }
+  const { error: swapErr } = await supabase.rpc("pace_swap_scheduled_sessions", {
+    p_user_id: userId,
+    p_plan_id: planId,
+    p_sessions: sessionsPayload,
+  });
+  if (swapErr) {
+    return { ok: false, error: "Could not update your schedule. Try again." };
   }
 
   // 6. Update plan metadata (last_replanned_at + persisted warnings, C-i).

@@ -13,13 +13,9 @@ async function fetchStats() {
     { count: totalUsers },
     { count: newUsers },
     { count: onboardedUsers },
-    sessionsRes,
-    subjectsRes,
-    profilesRes,
-    ageBandRes,
+    aggregateRes,
     errorsRes,
     { count: totalCourseworkItems },
-    practiceSessionsRes,
   ] = await Promise.all([
     db.from("profiles").select("*", { count: "exact", head: true }).then((r) => ({ count: r.count ?? 0 })),
     db.from("profiles").select("*", { count: "exact", head: true })
@@ -28,105 +24,59 @@ async function fetchStats() {
     db.from("profiles").select("*", { count: "exact", head: true })
       .not("session_length_minutes", "is", null)
       .then((r) => ({ count: r.count ?? 0 })),
-    db.from("sessions").select("status, duration_minutes"),
-    db.from("subjects").select("name, difficulty, confidence_pct"),
-    db.from("profiles").select("age_band, study_habits, goal_ranking, memory_score, session_length_minutes").not("session_length_minutes", "is", null),
-    db.from("profiles").select("age_band").not("age_band", "is", null),
+    db.rpc("admin_get_aggregate_stats"),
     db.from("app_errors").select("id, created_at, error_type, message, context, user_id")
       .order("created_at", { ascending: false }).limit(15).then((r) => r),
     db.from("coursework_items").select("*", { count: "exact", head: true }).then((r) => ({ count: r.count ?? 0 })),
-    db.from("practice_sessions").select("questions_answered, correct_count").eq("status", "completed"),
   ]);
 
+  if (aggregateRes.error) throw new Error(`admin_get_aggregate_stats: ${aggregateRes.error.message}`);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const agg = aggregateRes.data as any;
+
   // Sessions
-  const sessions = sessionsRes.data ?? [];
-  const completedCount = sessions.filter((s) => s.status === "completed").length;
-  const missedCount = sessions.filter((s) => s.status === "missed").length;
-  const scheduledCount = sessions.filter((s) => s.status === "scheduled").length;
-  const doneOrMissed = completedCount + missedCount;
+  const completedCount = Number(agg.sessions.completed);
+  const missedCount    = Number(agg.sessions.missed);
+  const scheduledCount = Number(agg.sessions.scheduled);
+  const doneOrMissed   = completedCount + missedCount;
   const completionRate = doneOrMissed > 0 ? Math.round((completedCount / doneOrMissed) * 100) : null;
 
   // Subjects
-  const subjectData = subjectsRes.data ?? [];
-  const allSubjectNames = subjectData.map((s) => s.name as string);
-  const subjectCounts = new Map<string, number>();
-  for (const name of allSubjectNames) {
-    subjectCounts.set(name, (subjectCounts.get(name) ?? 0) + 1);
-  }
-  const topSubjects = [...subjectCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const totalSubjectEntries = Number(agg.subjects.total);
+  const topSubjects: [string, number][] = (agg.subjects.top_names as { name: string; cnt: number }[]).map(
+    (r) => [r.name, r.cnt],
+  );
+  const difficultyCounts: [string, number][] = [
+    ["easy",   Number(agg.subjects.difficulty.easy)],
+    ["medium", Number(agg.subjects.difficulty.medium)],
+    ["hard",   Number(agg.subjects.difficulty.hard)],
+    ["unset",  Number(agg.subjects.difficulty.unset)],
+  ];
+  const avgConfidence  = agg.subjects.avg_confidence != null ? Number(agg.subjects.avg_confidence) : null;
+  const confidenceSet  = Number(agg.subjects.confidence_count);
 
-  // Difficulty distribution
-  const difficultyCounts = new Map<string, number>([["easy", 0], ["medium", 0], ["hard", 0], ["unset", 0]]);
-  for (const s of subjectData) {
-    const d = (s.difficulty as string | null) ?? "unset";
-    difficultyCounts.set(d, (difficultyCounts.get(d) ?? 0) + 1);
-  }
+  // Profiles / goals / habits
+  const avgMemory       = agg.profiles.avg_memory != null ? Number(agg.profiles.avg_memory) : null;
+  const memoryScoreCount = Number(agg.profiles.memory_count);
+  const topGoals: [string, number][]  = (agg.profiles.top_goals  as { goal: string; cnt: number }[]).map((r) => [r.goal, r.cnt]);
+  const topHabits: [string, number][] = (agg.profiles.top_habits as { habit: string; cnt: number }[]).map((r) => [r.habit, r.cnt]);
+  const ageBandCounts: [string, number][] = (agg.profiles.age_bands as { age_band: string; cnt: number }[]).map((r) => [r.age_band, r.cnt]);
 
-  // Confidence stats
-  const confidenceValues = subjectData
-    .map((s) => s.confidence_pct as number | null)
-    .filter((v): v is number => v !== null);
-  const avgConfidence = confidenceValues.length > 0
-    ? Math.round(confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length)
-    : null;
-  const confidenceSet = confidenceValues.length;
-
-  // Age bands
-  const ageBandData = ageBandRes.data ?? [];
-  const ageBandCounts = new Map<string, number>();
-  for (const row of ageBandData) {
-    const band = row.age_band as string;
-    if (band) ageBandCounts.set(band, (ageBandCounts.get(band) ?? 0) + 1);
-  }
-
-  // Memory scores
-  const profiles = profilesRes.data ?? [];
-  const memScores = profiles.map((p) => p.memory_score as number | null).filter((v): v is number => v !== null);
-  const avgMemory = memScores.length > 0
-    ? Math.round(memScores.reduce((a, b) => a + b, 0) / memScores.length)
+  // Practice
+  const totalPracticeSessions  = Number(agg.practice.total_sessions);
+  const totalQuestionsAnswered = Number(agg.practice.total_questions);
+  const totalCorrect           = Number(agg.practice.total_correct);
+  const avgPracticeAccuracy    = totalQuestionsAnswered > 0
+    ? Math.round((totalCorrect / totalQuestionsAnswered) * 100)
     : null;
 
-  // Top goals (first item in goal_ranking)
-  const goalCounts = new Map<string, number>();
-  for (const p of profiles) {
-    const ranking = p.goal_ranking as string[] | null;
-    if (ranking && ranking.length > 0) {
-      goalCounts.set(ranking[0], (goalCounts.get(ranking[0]) ?? 0) + 1);
-    }
-  }
-  const topGoals = [...goalCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-  // Study habits distribution
-  const habitCounts = new Map<string, number>();
-  for (const p of profiles) {
-    const habits = p.study_habits as string[] | null;
-    if (habits) {
-      for (const h of habits) habitCounts.set(h, (habitCounts.get(h) ?? 0) + 1);
-    }
-  }
-  const topHabits = [...habitCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-
-  const onboardingRate = totalUsers > 0
+  const onboardingRate = (totalUsers as number) > 0
     ? Math.round(((onboardedUsers as number) / (totalUsers as number)) * 100)
     : null;
 
   const errors = errorsRes.data ?? [];
   const errorsUnavailable = !!errorsRes.error;
-
-  // Practice stats
-  const practiceSessions = practiceSessionsRes.data ?? [];
-  const totalQuestionsAnswered = practiceSessions.reduce(
-    (sum, s) => sum + ((s.questions_answered as number) ?? 0),
-    0,
-  );
-  const totalCorrect = practiceSessions.reduce(
-    (sum, s) => sum + ((s.correct_count as number) ?? 0),
-    0,
-  );
-  const avgPracticeAccuracy =
-    totalQuestionsAnswered > 0
-      ? Math.round((totalCorrect / totalQuestionsAnswered) * 100)
-      : null;
 
   return {
     totalUsers,
@@ -137,21 +87,21 @@ async function fetchStats() {
     missedCount,
     scheduledCount,
     completionRate,
-    totalSubjectEntries: allSubjectNames.length,
+    totalSubjectEntries,
     topSubjects,
-    difficultyCounts: [...difficultyCounts.entries()],
+    difficultyCounts,
     avgConfidence,
     confidenceSet,
-    totalSubjectsWithConfidence: subjectData.length,
-    ageBandCounts: [...ageBandCounts.entries()].sort((a, b) => b[1] - a[1]),
+    totalSubjectsWithConfidence: totalSubjectEntries,
+    ageBandCounts,
     avgMemory,
-    memoryScoreCount: memScores.length,
+    memoryScoreCount,
     topGoals,
     topHabits,
     errors,
     errorsUnavailable,
     totalCourseworkItems: totalCourseworkItems as number,
-    totalPracticeSessions: practiceSessions.length,
+    totalPracticeSessions,
     totalQuestionsAnswered,
     avgPracticeAccuracy,
   };

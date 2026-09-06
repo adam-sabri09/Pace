@@ -24,6 +24,10 @@ export const SignUpSchema = z.object({
   ageConfirmed13Plus: z.literal(true, {
     error: "You must confirm you are 13 or older to use Pace.",
   }),
+  // CAPTCHA token produced by hCaptcha on the client. Optional in the schema —
+  // enforcement is handled by Supabase (which rejects signUp if the secret is
+  // configured and no valid token is supplied).
+  captchaToken: z.string().optional().default(""),
   // IANA timezone auto-detected on the client via Intl.DateTimeFormat().
   // The refine rejects non-IANA strings (e.g. "not-a-tz") before they reach
   // the DB; .catch("UTC") keeps the fallback for missing or unrecognised values.

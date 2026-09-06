@@ -22,12 +22,13 @@ const ITEMS: Item[] = [
 
 // Subset shown in the mobile bottom nav — 5 max fits on a 375px screen.
 // Settings is accessible via the gear icon in the TopAppBar instead.
+// Analytics is desktop-only; Coursework is a core upload flow that must be reachable on mobile.
 const MOBILE_ITEMS: Item[] = [
   { href: "/today", label: "Today", icon: "calendar_today" },
   { href: "/plan", label: "Plan", icon: "event_note" },
   { href: "/subjects", label: "Subjects", icon: "menu_book" },
-  { href: "/coach", label: "Coach", icon: "chat" },
   { href: "/coursework", label: "Coursework", icon: "description" },
+  { href: "/coach", label: "Coach", icon: "chat" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -47,9 +48,6 @@ export function SideNav({ isAdmin }: { isAdmin?: boolean }) {
     >
       <div className="mb-stack-lg px-2">
         <span className="font-display text-headline-md text-primary block">Pace</span>
-        <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 uppercase tracking-wider">
-          The Quiet Mentor
-        </p>
       </div>
       <ul className="flex flex-col gap-base">
         {items.map((item) => {

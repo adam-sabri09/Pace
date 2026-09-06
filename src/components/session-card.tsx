@@ -1,12 +1,13 @@
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import {
   markDoneAction,
   markMissedAction,
-  type SessionActionState,
+  submitFeedbackAction,
 } from "@/server/actions/sessions";
 
 export type SessionStatus = "scheduled" | "completed" | "missed";
@@ -37,21 +38,39 @@ export function SessionCard({
   durationMinutes,
   instruction,
 }: SessionCardProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [justCompleted, setJustCompleted] = useState(false);
+  const [feedbackDone, setFeedbackDone] = useState(false);
 
   const isActive = status === "scheduled";
   const isDone = status === "completed";
   const isMissed = status === "missed";
 
-  const runAction = (fn: (id: string) => Promise<SessionActionState>) => () => {
+  const runMarkDone = () => {
     startTransition(async () => {
-      // Fire-and-forget from the client's view; server revalidatePath()
-      // in the action refreshes the tree. If the action returns an error
-      // we surface nothing here in Step 6 — the muted status still fits
-      // the "silent status change" call (Choice 2-A). Reconsider when
-      // Missed grows into an overlay flow in Step 7.
-      await fn(id);
+      const result = await markDoneAction(id);
+      if (result?.ok) setJustCompleted(true);
     });
+  };
+
+  const runMarkMissed = () => {
+    startTransition(async () => {
+      await markMissedAction(id);
+    });
+  };
+
+  const submitConfidence = (confidence: number) => {
+    startTransition(async () => {
+      await submitFeedbackAction(id, confidence);
+      setFeedbackDone(true);
+      router.refresh();
+    });
+  };
+
+  const handleSkip = () => {
+    setFeedbackDone(true);
+    router.refresh();
   };
 
   const containerCls =
@@ -59,6 +78,7 @@ export function SessionCard({
     (isDone || isMissed ? " opacity-70" : "");
 
   return (
+    <>
     <article className={containerCls} data-testid="session-card" data-status={status}>
       <div className="absolute left-0 top-0 bottom-0 w-1 bg-outline-variant" aria-hidden="true" />
       <div className="flex flex-col sm:flex-row sm:items-center">
@@ -100,7 +120,7 @@ export function SessionCard({
             </p>
           </div>
         </div>
-        {isActive && (
+        {isActive && !justCompleted && (
           <div className="flex flex-col gap-2 p-4 pt-0 sm:pt-4 border-t sm:border-t-0 sm:border-l border-outline-variant sm:w-48 sm:justify-center">
             <Link
               href={`/study/${id}`}
@@ -111,7 +131,7 @@ export function SessionCard({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={runAction(markMissedAction)}
+                onClick={runMarkMissed}
                 disabled={isPending}
                 aria-busy={isPending}
                 className="flex-1 px-3 py-2 font-label-sm text-label-sm border border-outline text-on-surface-variant rounded-lg hover:bg-surface-variant transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -120,7 +140,7 @@ export function SessionCard({
               </button>
               <button
                 type="button"
-                onClick={runAction(markDoneAction)}
+                onClick={runMarkDone}
                 disabled={isPending}
                 aria-busy={isPending}
                 className="flex-1 px-3 py-2 font-label-sm text-label-sm bg-primary-container text-on-primary rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
@@ -135,5 +155,34 @@ export function SessionCard({
         )}
       </div>
     </article>
+    {justCompleted && !feedbackDone && (
+      <div className="rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 flex flex-col gap-2">
+        <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+          How confident do you feel?
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              disabled={isPending}
+              onClick={() => submitConfidence(n)}
+              className="px-3 py-1.5 font-label-md text-label-md border border-outline-variant rounded-lg hover:bg-secondary-container hover:text-on-secondary-container transition-colors disabled:opacity-50"
+              aria-label={`Confidence ${n} out of 5`}
+            >
+              {n}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={handleSkip}
+            className="px-3 py-1.5 font-label-sm text-label-sm text-outline hover:text-on-surface transition-colors"
+          >
+            Skip
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

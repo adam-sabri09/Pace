@@ -5,14 +5,20 @@ import { useActionState } from "react";
 import { logInAction, type AuthActionState } from "@/server/actions/auth";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
-/**
- * Login form — Pace visual system (DESIGN-SPEC.md §7).
- */
-export function LoginForm() {
+const URL_ERRORS: Record<string, string> = {
+  oauth_cancelled: "Google sign-in was cancelled.",
+  oauth_error: "Google sign-in failed. Please try again.",
+  email_confirm_failed: "That confirmation link didn't work. Try signing in, or request a new link.",
+  invalid_link: "That link is invalid or has expired. Try signing in.",
+};
+
+export function LoginForm({ urlError }: { urlError?: string }) {
   const [state, formAction, pending] = useActionState<AuthActionState, FormData>(
     logInAction,
     null,
   );
+
+  const bannerMessage = urlError ? (URL_ERRORS[urlError] ?? "Something went wrong. Please try again.") : null;
 
   return (
     <main className="min-h-full flex-grow flex items-center justify-center px-container-margin py-stack-lg">
@@ -26,6 +32,12 @@ export function LoginForm() {
             Sign in to see today&rsquo;s plan.
           </p>
         </header>
+
+        {bannerMessage && (
+          <p role="alert" className="font-label-md text-label-md text-error text-center">
+            {bannerMessage}
+          </p>
+        )}
 
         <form action={formAction} className="flex flex-col gap-stack-md" noValidate>
           <div className="flex flex-col gap-1">
@@ -65,13 +77,19 @@ export function LoginForm() {
           </div>
 
           {state && !state.ok && (
-            <p
-              role="alert"
-              className="font-label-md text-label-md text-error mt-2"
-            >
+            <p role="alert" className="font-label-md text-label-md text-error mt-2">
               {state.error}
             </p>
           )}
+
+          <div className="flex justify-end -mt-2">
+            <Link
+              href="/forgot-password"
+              className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary hover:underline underline-offset-2 transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
 
           <button
             type="submit"
@@ -93,10 +111,7 @@ export function LoginForm() {
 
         <p className="text-center font-label-md text-label-md text-on-surface-variant">
           New to Pace?{" "}
-          <Link
-            href="/signup"
-            className="text-primary hover:underline underline-offset-2"
-          >
+          <Link href="/signup" className="text-primary hover:underline underline-offset-2">
             Create an account
           </Link>
         </p>

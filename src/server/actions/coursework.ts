@@ -147,6 +147,7 @@ export async function uploadCourseworkAction(
       schema: CourseworkExtractedSchema,
       messages: [{ role: "user", content: parts }],
       maxRetries: 0,
+      abortSignal: AbortSignal.timeout(60_000),
     });
 
     await supabase

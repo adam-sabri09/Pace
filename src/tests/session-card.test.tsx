@@ -5,11 +5,16 @@ import { describe, expect, it, vi } from "vitest";
  * intercept it — client-side we care about which handler is wired to
  * which button, not the network call itself.
  */
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
 const markDone = vi.fn();
 const markMissed = vi.fn();
 vi.mock("@/server/actions/sessions", () => ({
   markDoneAction: (id: string) => markDone(id),
   markMissedAction: (id: string) => markMissed(id),
+  submitFeedbackAction: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 import { render, screen, cleanup } from "@testing-library/react";
