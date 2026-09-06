@@ -21,18 +21,16 @@ export function StartPracticeButton({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [isPersisting, startPersistTransition] = useTransition();
   const [difficulty, setDifficulty] = useState<Difficulty>(initialDifficulty);
 
   const difficultyLabel = DIFFICULTIES.find((d) => d.value === difficulty)?.label ?? "Medium";
 
   function handleDifficultyChange(d: Difficulty) {
     setDifficulty(d);
-    // Persist immediately so the selection survives page revisits.
-    // Non-fatal: if this fails, practice still starts with the locally selected value.
-    startPersistTransition(async () => {
-      await updateCourseworkDifficultyAction(courseworkItemId, d);
-    });
+    // Fire-and-forget: persist without a transition so the visual state
+    // updates immediately. Non-fatal if this fails — practice still starts
+    // with the locally selected value.
+    void updateCourseworkDifficultyAction(courseworkItemId, d);
   }
 
   function handleClick() {
@@ -78,7 +76,7 @@ export function StartPracticeButton({
       </p>
       <button
         onClick={handleClick}
-        disabled={isPending || isPersisting}
+        disabled={isPending}
         className="px-8 py-3 font-label-lg text-label-lg bg-primary text-on-primary rounded-full disabled:opacity-50 transition-opacity"
       >
         {isPending ? "Starting…" : "Practice now"}

@@ -69,7 +69,7 @@ export async function deletePassedExamsAction(): Promise<DeletePassedExamsResult
       .from("sessions")
       .delete()
       .eq("user_id", user.id)
-      .eq("status", "missed")
+      .in("status", ["missed", "scheduled"])
       .lt("starts_at", nowISO)
       .in("topic_id", topicIds);
 
@@ -105,17 +105,13 @@ export async function deleteSubjectAction(subjectId: string): Promise<DeleteSubj
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "You need to be signed in." };
 
-  const { data: deleted, error } = await supabase
+  const { error } = await supabase
     .from("subjects")
     .delete()
     .eq("id", subjectId)
-    .eq("user_id", user.id)
-    .select("id");
+    .eq("user_id", user.id);
 
   if (error) return { ok: false, error: "Could not delete the subject. Try again." };
-  if (!deleted || deleted.length === 0) {
-    return { ok: false, error: "Subject not found — it may have already been deleted. Refresh the page." };
-  }
 
   revalidatePath("/subjects");
   revalidatePath("/plan");
