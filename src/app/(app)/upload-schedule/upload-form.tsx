@@ -125,6 +125,9 @@ export function UploadForm() {
         <p className="font-label-sm text-label-sm text-on-surface-variant">
           JPEG, PNG, WebP, GIF, or PDF — max 5 MB
         </p>
+        <p className="font-label-sm text-label-sm text-on-surface-variant">
+          Your file is sent to Google Gemini for processing and is not stored after extraction.
+        </p>
       </section>
 
       {fileName && !subjects && (

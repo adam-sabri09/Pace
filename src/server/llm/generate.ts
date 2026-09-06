@@ -61,9 +61,13 @@ export async function generatePlan(input: PlanInput): Promise<GenerateResult> {
         model,
         schema: PlanOutputSchema,
         prompt,
+        abortSignal: AbortSignal.timeout(30_000),
       });
       raw = object;
     } catch (err) {
+      if (err instanceof Error && err.name === "TimeoutError") {
+        return { ok: false, error: "Plan generation timed out. Please try again." };
+      }
       const msg = err instanceof Error ? err.message : String(err);
       return {
         ok: false,

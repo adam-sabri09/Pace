@@ -148,9 +148,15 @@ export async function sendCoachMessageAction(
   const systemPrompt = buildSystemPrompt(ctx, today);
 
   // Build conversation history for the LLM (last 10 messages to stay within context).
+  // Guard content length defensively: history is a client-provided server action
+  // parameter, so content strings are capped to prevent token stuffing.
+  const HISTORY_ITEM_MAX = 10_000;
   const recent = history.slice(-10);
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [
-    ...recent.map((m) => ({ role: m.role, content: m.content })),
+    ...recent.map((m) => ({
+      role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+      content: typeof m.content === "string" ? m.content.slice(0, HISTORY_ITEM_MAX) : "",
+    })),
     { role: "user", content: userMessage },
   ];
 
@@ -160,9 +166,8 @@ export async function sendCoachMessageAction(
       model: google(MODEL_ID),
       system: systemPrompt,
       messages,
-      // Do not retry: quota and auth errors are definitive.
-      // Retrying burns quota tokens and adds delay for no benefit.
       maxRetries: 0,
+      abortSignal: AbortSignal.timeout(25_000),
     });
     reply = result.text.trim();
     if (!reply) reply = "I'm not sure how to answer that — could you rephrase?";
@@ -171,6 +176,7 @@ export async function sendCoachMessageAction(
     const lower = msg.toLowerCase();
     console.error("[coach] generateText failed:", msg);
 
+    const isTimeout = err instanceof Error && err.name === "TimeoutError";
     const isQuota =
       lower.includes("quota") ||
       lower.includes("429") ||
@@ -181,6 +187,9 @@ export async function sendCoachMessageAction(
       lower.includes("authentication") ||
       lower.includes("unauthorized");
 
+    if (isTimeout) {
+      return { ok: false, error: "Coach took too long to respond. Please try again." };
+    }
     if (isQuota) {
       return {
         ok: false,

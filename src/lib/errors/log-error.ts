@@ -9,6 +9,7 @@ export type AppErrorType =
   | "replan"
   | "onboarding"
   | "coursework_upload"
+  | "drive_import"
   | "practice_evaluation"
   | "other";
 

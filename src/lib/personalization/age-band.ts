@@ -15,6 +15,8 @@ export interface AgeBandUIConfig {
   welcomeBack: string;
   /** Subtitle on the completed session overlay. */
   sessionCompleteSubtitle: string;
+  /** Controls information density across the UI. */
+  uiDensity: 'simple' | 'standard' | 'dense';
 }
 
 export const AGE_BAND_UI: Record<AgeBand, AgeBandUIConfig> = {
@@ -23,30 +25,35 @@ export const AGE_BAND_UI: Record<AgeBand, AgeBandUIConfig> = {
     sessionCompleteMessage: "Amazing work!",
     sessionCompleteSubtitle: "Session complete — you did it!",
     welcomeBack: "Welcome back! You've got this.",
+    uiDensity: "simple",
   },
   intermediate: {
     greeting: (name) => `Hi ${name} — here's your plan for today.`,
     sessionCompleteMessage: "Great work!",
     sessionCompleteSubtitle: "Session complete.",
     welcomeBack: "Welcome back — stay focused.",
+    uiDensity: "standard",
   },
   senior: {
     greeting: (name) => `Good day, ${name}.`,
     sessionCompleteMessage: "Well done.",
     sessionCompleteSubtitle: "Session marked complete.",
     welcomeBack: "Welcome back. Let's continue.",
+    uiDensity: "standard",
   },
   university: {
     greeting: (name) => `${name} — here's your plan.`,
     sessionCompleteMessage: "Done.",
     sessionCompleteSubtitle: "Session marked complete. Keep it up.",
     welcomeBack: "Welcome back. Keep going.",
+    uiDensity: "dense",
   },
   adult: {
     greeting: (name) => `Good day, ${name}.`,
     sessionCompleteMessage: "Session complete.",
     sessionCompleteSubtitle: "Progress recorded.",
     welcomeBack: "Welcome back.",
+    uiDensity: "dense",
   },
 };
 

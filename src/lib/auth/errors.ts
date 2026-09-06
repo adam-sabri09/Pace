@@ -31,6 +31,8 @@ export function friendlyAuthError(
     case "over_email_send_rate_limit":
     case "over_request_rate_limit":
       return "Too many attempts. Wait a moment and try again.";
+    case "captcha_failed":
+      return "CAPTCHA verification failed. Please try again.";
     default:
       return fallback;
   }

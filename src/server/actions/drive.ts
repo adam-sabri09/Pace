@@ -5,6 +5,7 @@ import "server-only";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { uploadCourseworkAction } from "@/server/actions/coursework";
+import { logAppError } from "@/lib/errors/log-error";
 
 const DriveImportSchema = z.object({
   fileId: z.string().min(1).max(200),
@@ -14,10 +15,10 @@ const DriveImportSchema = z.object({
 });
 
 // Google Workspace document MIME types and their export equivalents.
+// Only Google Docs is supported — spreadsheet and presentation exports are
+// excluded because the coursework pipeline does not support their output types.
 const WORKSPACE_EXPORT: Record<string, string> = {
   "application/vnd.google-apps.document": "text/plain",
-  "application/vnd.google-apps.spreadsheet": "text/csv",
-  "application/vnd.google-apps.presentation": "text/plain",
 };
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -27,8 +28,9 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/gif",
   "application/pdf",
   "text/plain",
-  "text/csv",
 ]);
+
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 /**
  * Downloads a file from Google Drive using a short-lived access token obtained
@@ -77,18 +79,43 @@ export async function importFromDriveAction(raw: unknown) {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
   } catch {
+    await logAppError(
+      "drive_import",
+      "Network error downloading from Drive",
+      { fileName, mimeType },
+      user.id,
+    );
     return { ok: false as const, error: "Network error downloading from Google Drive." };
   }
 
   if (!driveRes.ok) {
+    // Log every non-2xx Drive response — by this point the user completed the
+    // Picker flow and Drive still failed, so all of these are real failures,
+    // not user cancellations. User-facing messages remain generic.
+    await logAppError(
+      "drive_import",
+      `Drive API error ${driveRes.status}`,
+      { fileName, mimeType, status: driveRes.status },
+      user.id,
+    );
+    if (driveRes.status === 404) {
+      return { ok: false as const, error: "File not found or access denied." };
+    }
     if (driveRes.status === 401 || driveRes.status === 403) {
       return { ok: false as const, error: "Google Drive access denied. Please try again." };
     }
     return { ok: false as const, error: "Could not download file from Google Drive." };
   }
 
+  // Pre-check Content-Length before buffering to avoid loading oversized files
+  // into memory. Drive omits this header on export endpoints, so the
+  // post-download check below remains the authoritative guard.
+  const contentLength = Number(driveRes.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_FILE_BYTES) {
+    return { ok: false as const, error: "File too large — 5 MB maximum." };
+  }
+
   const bytes = await driveRes.arrayBuffer();
-  const MAX_FILE_BYTES = 5 * 1024 * 1024;
   if (bytes.byteLength > MAX_FILE_BYTES) {
     return { ok: false as const, error: "File too large — 5 MB maximum." };
   }
@@ -97,6 +124,7 @@ export async function importFromDriveAction(raw: unknown) {
   }
 
   // Build a File object and delegate to the existing upload pipeline.
+  // uploadCourseworkAction handles its own error logging internally.
   const baseName = fileName.replace(/\.[^.]+$/, "");
   const file = new File([bytes], `${baseName}.${resolvedMime.split("/")[1] ?? "bin"}`, {
     type: resolvedMime,

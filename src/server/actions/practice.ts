@@ -167,12 +167,17 @@ export async function startPracticeAction(
 // Submit answer
 // ---------------------------------------------------------------------------
 
+const MAX_ANSWER_LENGTH = 5_000;
+
 export async function submitAnswerAction(
   sessionId: string,
   userAnswer: string,
   responseTimeMs: number,
 ): Promise<SubmitAnswerResult> {
   if (!userAnswer.trim()) return { ok: false, error: "Please write an answer first." };
+  if (userAnswer.length > MAX_ANSWER_LENGTH) {
+    return { ok: false, error: "Answer is too long. Please keep it under 5,000 characters." };
+  }
 
   const supabase = await createClient();
   const {
@@ -218,6 +223,7 @@ export async function submitAnswerAction(
         },
       ],
       maxRetries: 0,
+      abortSignal: AbortSignal.timeout(20_000),
     });
     isCorrect = object.isCorrect;
     feedback = object.feedback;
@@ -527,6 +533,7 @@ Generate exactly ONE question. Return the question text, type, concept tested, a
         },
       ],
       maxRetries: 1,
+      abortSignal: AbortSignal.timeout(20_000),
     });
     return object as StoredQuestion;
   } catch {

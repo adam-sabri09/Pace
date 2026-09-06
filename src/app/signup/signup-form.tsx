@@ -1,20 +1,91 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { signUpAction, type AuthActionState } from "@/server/actions/auth";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+
+declare global {
+  interface Window {
+    hcaptcha?: {
+      render: (container: HTMLElement, options: Record<string, unknown>) => number;
+      reset: (widgetId: number) => void;
+    };
+  }
+}
 
 /**
  * Signup form — Pace visual system (DESIGN-SPEC.md §7 / §2.4 / §2.1).
  * Centered max-w-md column, no nav shell, bottom-border inputs, primary CTA,
  * small text link at the bottom for the opposite action.
+ *
+ * hCaptcha is loaded on mount when NEXT_PUBLIC_HCAPTCHA_SITE_KEY is set.
+ * The token is captured in a ref (no re-render) and forwarded to the server
+ * action via FormData. Supabase verifies the token server-side.
+ * The secret key never appears in frontend code.
  */
 export function SignupForm() {
   const [state, formAction, pending] = useActionState<AuthActionState, FormData>(
     signUpAction,
     null,
   );
+
+  const siteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY;
+  const captchaContainerRef = useRef<HTMLDivElement>(null);
+  const captchaTokenRef = useRef<string>("");
+  const captchaWidgetIdRef = useRef<number | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+
+  // Load the hCaptcha script and render the widget once the container is mounted.
+  // render=explicit prevents hCaptcha from auto-scanning the DOM.
+  useEffect(() => {
+    if (!siteKey || !captchaContainerRef.current) return;
+
+    const renderWidget = () => {
+      if (!captchaContainerRef.current || captchaWidgetIdRef.current !== null) return;
+      if (!window.hcaptcha) return;
+      captchaWidgetIdRef.current = window.hcaptcha.render(captchaContainerRef.current, {
+        sitekey: siteKey,
+        size: "normal",
+        theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+        callback: (token: string) => {
+          captchaTokenRef.current = token;
+          setCaptchaError(null);
+        },
+        "expired-callback": () => {
+          captchaTokenRef.current = "";
+        },
+        "error-callback": () => {
+          captchaTokenRef.current = "";
+        },
+      });
+    };
+
+    // Script may already be in the DOM (e.g. back-navigation).
+    if (document.getElementById("hcaptcha-script")) {
+      renderWidget();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "hcaptcha-script";
+    script.src = "https://js.hcaptcha.com/1/api.js?render=explicit";
+    script.async = true;
+    script.defer = true;
+    script.onload = renderWidget;
+    document.head.appendChild(script);
+  }, [siteKey]);
+
+  // Reset the widget whenever the server action returns an error so the user
+  // must complete a fresh challenge before resubmitting.
+  useEffect(() => {
+    if (state && !state.ok) {
+      captchaTokenRef.current = "";
+      if (captchaWidgetIdRef.current !== null && window.hcaptcha) {
+        window.hcaptcha.reset(captchaWidgetIdRef.current);
+      }
+    }
+  }, [state]);
 
   // Inject the browser's IANA timezone at submit time so the server action can
   // persist it to profiles.time_zone. Done here (not in state/effect) to
@@ -28,6 +99,15 @@ export function SignupForm() {
     } catch {
       formData.set("timeZone", "UTC");
     }
+
+    // Client-side guard: if the CAPTCHA widget is loaded but the user hasn't
+    // completed it, block submission and surface a clear message.
+    if (siteKey && !captchaTokenRef.current) {
+      setCaptchaError("Please complete the CAPTCHA to continue.");
+      return;
+    }
+
+    formData.set("captchaToken", captchaTokenRef.current);
     return formAction(formData);
   };
 
@@ -111,9 +191,24 @@ export function SignupForm() {
               className="mt-1 w-4 h-4 accent-primary-container"
             />
             <span className="font-body-md text-body-md text-on-surface-variant">
-              I am 13 years old or older.
+              I am 13 years old or older and I agree to the{" "}
+              <Link href="/terms" className="underline hover:text-primary">Terms</Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="underline hover:text-primary">Privacy Policy</Link>.
             </span>
           </label>
+
+          {/* hCaptcha widget — only rendered when the site key is configured */}
+          {siteKey && (
+            <div className="flex flex-col gap-1">
+              <div ref={captchaContainerRef} />
+              {captchaError && (
+                <p role="alert" className="font-label-sm text-label-sm text-error">
+                  {captchaError}
+                </p>
+              )}
+            </div>
+          )}
 
           {state && !state.ok && (
             <p

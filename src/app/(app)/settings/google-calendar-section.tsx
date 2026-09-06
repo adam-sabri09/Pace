@@ -6,11 +6,13 @@ import { disconnectGoogleCalendarAction } from "@/server/actions/google-calendar
 
 interface Props {
   connected: boolean;
+  /** The Google account email address, when connected and available. */
+  email: string | null;
   /** False when GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set. */
   configured: boolean;
 }
 
-export function GoogleCalendarSection({ connected, configured }: Props) {
+export function GoogleCalendarSection({ connected, email, configured }: Props) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -20,6 +22,20 @@ export function GoogleCalendarSection({ connected, configured }: Props) {
       router.push("/settings?disconnected=google_calendar");
     });
   }
+
+  const statusLabel = !configured
+    ? "Not available"
+    : connected
+      ? "Connected"
+      : "Not connected";
+
+  const statusBody = !configured
+    ? "Google integration has not been configured for this deployment."
+    : connected
+      ? email
+        ? `Connected as ${email}. Pace will avoid scheduling sessions during your Google Calendar events.`
+        : "Pace will avoid scheduling sessions during your Google Calendar events."
+      : "Connect your Google Calendar so Pace avoids scheduling during your busy times.";
 
   return (
     <section className="border border-outline-variant rounded-xl p-stack-md bg-surface-container-lowest">
@@ -33,18 +49,10 @@ export function GoogleCalendarSection({ connected, configured }: Props) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-label-md text-label-md text-on-surface">
-            {!configured
-              ? "Not available"
-              : connected
-                ? "Connected"
-                : "Not connected"}
+            {statusLabel}
           </p>
           <p className="font-body-md text-body-md text-on-surface-variant mt-0.5">
-            {!configured
-              ? "Google integration has not been configured for this deployment."
-              : connected
-                ? "Pace will avoid scheduling sessions during your Google Calendar events."
-                : "Connect your Google Calendar so Pace avoids scheduling during your busy times."}
+            {statusBody}
           </p>
         </div>
 

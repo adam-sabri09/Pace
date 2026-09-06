@@ -12,7 +12,6 @@ export type GoogleCalendarStatus =
 export type CalendarBusyPeriod = {
   startsAt: string; // ISO UTC
   endsAt: string;   // ISO UTC
-  summary?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -28,16 +27,16 @@ export async function getGoogleCalendarStatusAction(): Promise<GoogleCalendarSta
 
   const { data } = await supabase
     .from("google_connections")
-    .select("id, scopes")
+    .select("id, scopes, email")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (!data) return { connected: false };
   const scopes = (data.scopes as string[] | null) ?? [];
-  const hasCalendar = scopes.some((s) =>
-    s.includes("calendar"),
-  );
-  return hasCalendar ? { connected: true, email: null } : { connected: false };
+  const hasCalendar = scopes.some((s) => s.includes("calendar"));
+  return hasCalendar
+    ? { connected: true, email: (data.email as string | null) ?? null }
+    : { connected: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +52,38 @@ export async function disconnectGoogleCalendarAction(): Promise<DisconnectResult
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
 
+  // Fetch current tokens so we can revoke them at Google.
+  // Use the user's own session (RLS allows them to read their own row).
+  const { data: conn } = await supabase
+    .from("google_connections")
+    .select("refresh_token, access_token")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  // Revoke the Google token before removing the local record.
+  // We prefer revoking the refresh token (broader revocation); fall back to
+  // the access token. Failure is non-fatal — a stale/expired token must never
+  // block the user from disconnecting locally.
+  if (conn) {
+    const tokenToRevoke =
+      (conn.refresh_token as string | null) ??
+      (conn.access_token as string | null);
+    if (tokenToRevoke) {
+      try {
+        await fetch(
+          `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tokenToRevoke)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          },
+        );
+      } catch {
+        // Revocation failure is intentionally swallowed.
+      }
+    }
+  }
+
+  // Remove the local connection regardless of revocation outcome.
   const { error } = await supabase
     .from("google_connections")
     .delete()
@@ -66,9 +97,11 @@ export async function disconnectGoogleCalendarAction(): Promise<DisconnectResult
 // Token helpers (server-only, not exported as server actions)
 // ---------------------------------------------------------------------------
 
-async function refreshAccessToken(
-  refreshToken: string,
-): Promise<{ access_token: string; expires_in: number } | null> {
+async function refreshAccessToken(refreshToken: string): Promise<{
+  access_token: string;
+  expires_in: number;
+  refresh_token?: string; // Google may issue a rotated refresh token
+} | null> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
@@ -85,9 +118,17 @@ async function refreshAccessToken(
   });
 
   if (!res.ok) return null;
-  const json = (await res.json()) as { access_token?: string; expires_in?: number };
+  const json = (await res.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    refresh_token?: string;
+  };
   if (!json.access_token) return null;
-  return { access_token: json.access_token, expires_in: json.expires_in ?? 3600 };
+  return {
+    access_token: json.access_token,
+    expires_in: json.expires_in ?? 3600,
+    refresh_token: json.refresh_token,
+  };
 }
 
 /**
@@ -118,10 +159,19 @@ export async function getValidAccessToken(userId: string): Promise<string | null
 
   const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000);
 
-  // Persist the new access token (fire-and-forget — failure is non-fatal).
+  // Persist the updated tokens. If Google issued a rotated refresh token,
+  // store it — otherwise keep the existing one.
+  const updateData: Record<string, unknown> = {
+    access_token: refreshed.access_token,
+    token_expiry: newExpiry.toISOString(),
+  };
+  if (refreshed.refresh_token) {
+    updateData.refresh_token = refreshed.refresh_token;
+  }
+
   await svc
     .from("google_connections")
-    .update({ access_token: refreshed.access_token, token_expiry: newExpiry.toISOString() })
+    .update(updateData)
     .eq("user_id", userId);
 
   return refreshed.access_token;
