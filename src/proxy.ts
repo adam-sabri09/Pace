@@ -3,7 +3,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
 
 // Routes that are public (no auth required).
-const PUBLIC_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/auth/callback", "/auth/confirm", "/privacy", "/terms"]);
+const PUBLIC_PATHS = new Set(["/", "/login", "/signup", "/forgot-password", "/auth/callback", "/auth/confirm", "/privacy", "/terms", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest"]);
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
