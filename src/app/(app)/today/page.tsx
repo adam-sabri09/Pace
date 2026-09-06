@@ -219,6 +219,7 @@ export default async function TodayPage() {
   const studyStreak = computeStudyStreak(completedLocalDates, localNow.dateString);
 
   const allDone = cards.length > 0 && cards.every((c) => c.status === "completed");
+  const completedToday = cards.filter((c) => c.status === "completed").length;
   const hasSubjects = (subjectsRes.data ?? []).length > 0;
   const sessionsError = sessionsRes.error != null;
   const topGoal = (profile?.goal_ranking as string[] | null)?.[0] ?? null;
@@ -459,12 +460,23 @@ export default async function TodayPage() {
             <p className="font-body-lg text-body-lg text-on-surface-variant">
               {dateLabel}
             </p>
-            {studyStreak >= 2 && (
+            {studyStreak >= ageBandUI.streakMinForBadge && (
               <span
-                className="font-label-sm text-label-sm bg-secondary/10 text-secondary border border-secondary/20 rounded-full px-2 py-0.5"
+                className={`streak-badge font-label-sm text-label-sm bg-secondary/10 text-secondary border border-secondary/20 rounded-full px-2 py-0.5 ${
+                  ageBandUI.streakBadgeStyle === "fire-animated" || ageBandUI.streakBadgeStyle === "energetic" ? "font-semibold" : ""
+                }`}
                 title={`${studyStreak}-day study streak`}
               >
-                {studyStreak} day streak
+                {ageBandUI.streakBadgeStyle === "fire-animated"
+                  ? (
+                    <>
+                      <span className="streak-fire" aria-hidden="true">🔥</span>
+                      {` ${studyStreak} day streak!`}
+                    </>
+                  )
+                  : ageBandUI.streakBadgeStyle === "energetic"
+                  ? `⚡ ${studyStreak} day streak!`
+                  : `${studyStreak} day streak`}
               </span>
             )}
           </div>
@@ -526,6 +538,8 @@ export default async function TodayPage() {
           <p className={
             ageBandUI.uiDensity === "simple"
               ? "font-body-lg text-body-lg text-on-surface-variant mb-3"
+              : ageBandUI.uiDensity === "dense"
+              ? "font-body-sm text-body-sm text-on-surface-variant mb-3"
               : "font-body-md text-body-md text-on-surface-variant mb-3"
           }>
             {recommendation.rationale}
@@ -570,6 +584,23 @@ export default async function TodayPage() {
         </div>
       )}
 
+      {ageBandUI.showStreakMilestone && [7, 14, 21, 30].includes(studyStreak) && (
+        <div className="milestone-banner rounded-xl border border-secondary/25 bg-secondary/5 px-5 py-4">
+          <p className="font-headline-md text-headline-md text-secondary">
+            {studyStreak === 7
+              ? "🌟 7-day streak — great consistency!"
+              : studyStreak === 14
+              ? "🔥 Two-week streak — you're building something!"
+              : studyStreak === 21
+              ? "💪 Three weeks straight — incredible!"
+              : "🏆 30-day streak — that's commitment!"}
+          </p>
+          <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+            Keep going — small sessions every day add up.
+          </p>
+        </div>
+      )}
+
       {sessionsError ? (
         <div className="w-full bg-error/5 border border-error/20 rounded-xl p-stack-lg flex flex-col items-center gap-stack-sm text-center">
           <span
@@ -590,19 +621,63 @@ export default async function TodayPage() {
           <h2 className="font-headline-md text-headline-md text-on-surface">
             Study sessions
           </h2>
-          {allDone && (
-            <div className="rounded-xl border border-primary/25 bg-primary/5 px-5 py-4 flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }} aria-hidden="true">check_circle</span>
-                <p className="font-headline-md text-headline-md text-primary">That&rsquo;s today done.</p>
+          {ageBandUI.showDailyProgress && !allDone && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-on-surface-variant">
+                  Today&rsquo;s progress
+                </span>
+                <span className="font-label-sm text-label-sm text-on-surface-variant">
+                  {completedToday} of {cards.length}
+                </span>
               </div>
-              <p className="font-body-md text-body-md text-on-surface-variant">Every session completed. Tomorrow&rsquo;s plan is ready when you need it.</p>
+              <div className="h-1.5 bg-surface-container rounded-full overflow-hidden">
+                <div
+                  className="progress-bar-fill h-full bg-primary rounded-full"
+                  style={{ width: `${Math.round((completedToday / cards.length) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {allDone && (
+            <div className={`alldone-banner rounded-xl border px-5 py-4 flex flex-col gap-1 ${
+              ageBandUI.celebrationIntensity === "high"
+                ? "border-secondary/25 bg-secondary/5"
+                : "border-primary/25 bg-primary/5"
+            }`}>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`material-symbols-outlined ${
+                    ageBandUI.celebrationIntensity === "high"
+                      ? "text-secondary text-[28px]"
+                      : ageBandUI.celebrationIntensity === "minimal"
+                      ? "text-outline text-[20px]"
+                      : "text-primary text-[24px]"
+                  }`}
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                  aria-hidden="true"
+                >
+                  check_circle
+                </span>
+                <p className={`font-headline-md text-headline-md ${
+                  ageBandUI.celebrationIntensity === "high"
+                    ? "text-secondary"
+                    : ageBandUI.celebrationIntensity === "minimal"
+                    ? "text-on-surface-variant"
+                    : "text-primary"
+                }`}>
+                  {ageBandUI.allDoneTitle}
+                </p>
+              </div>
+              <p className="font-body-md text-body-md text-on-surface-variant">
+                {ageBandUI.allDoneBody}
+              </p>
             </div>
           )}
           {cards.map((c) => {
             const { rationale, topicId: _topicId, ...cardProps } = c;
             return (
-              <div key={c.id} className="flex flex-col gap-1">
+              <div key={c.id} className="flex flex-col gap-1 session-card-wrapper">
                 <SessionCard {...cardProps} />
                 {rationale && (
                   <p className="font-body-sm text-body-sm text-on-surface-variant px-1">
@@ -615,46 +690,102 @@ export default async function TodayPage() {
         </section>
       ) : hasSubjects ? (
         <div className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-lg flex flex-col items-center gap-stack-sm text-center">
-          <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center">
-            <span
-              className="material-symbols-outlined text-3xl text-secondary"
-              style={{ fontVariationSettings: "'wght' 300" }}
+          {ageBandUI.emptyStateStyle === "illustrated-playful" ? (
+            /* Junior: animated SVG sun illustration */
+            <svg
+              viewBox="0 0 80 80"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-20 h-20 free-day-art"
               aria-hidden="true"
             >
-              wb_sunny
-            </span>
-          </div>
+              <line x1="40" y1="8" x2="40" y2="17" stroke="var(--color-secondary)" strokeWidth="3" strokeLinecap="round"/>
+              <line x1="62" y1="17" x2="57" y2="23" stroke="var(--color-secondary)" strokeWidth="3" strokeLinecap="round"/>
+              <line x1="72" y1="40" x2="63" y2="40" stroke="var(--color-secondary)" strokeWidth="3" strokeLinecap="round"/>
+              <line x1="62" y1="63" x2="57" y2="57" stroke="var(--color-secondary)" strokeWidth="3" strokeLinecap="round"/>
+              <line x1="40" y1="72" x2="40" y2="63" stroke="var(--color-secondary)" strokeWidth="3" strokeLinecap="round"/>
+              <line x1="18" y1="63" x2="23" y2="57" stroke="var(--color-secondary)" strokeWidth="3" strokeLinecap="round"/>
+              <line x1="8" y1="40" x2="17" y2="40" stroke="var(--color-secondary)" strokeWidth="3" strokeLinecap="round"/>
+              <line x1="18" y1="17" x2="23" y2="23" stroke="var(--color-secondary)" strokeWidth="3" strokeLinecap="round"/>
+              <circle cx="40" cy="40" r="17" fill="var(--color-secondary-container)"/>
+              <circle cx="40" cy="40" r="13" fill="var(--color-secondary)" opacity="0.75"/>
+            </svg>
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center">
+              <span
+                className="material-symbols-outlined text-3xl text-secondary"
+                style={{ fontVariationSettings: "'wght' 300" }}
+                aria-hidden="true"
+              >
+                wb_sunny
+              </span>
+            </div>
+          )}
           <h2 className="font-headline-md text-headline-md text-on-surface">
-            Free day
+            {ageBandUI.freeDayTitle}
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-sm">
-            {recommendation
-              ? "No sessions scheduled today. Rest up, or try the suggestion above."
-              : "No sessions scheduled today. Rest up — you've earned it."}
+            {ageBandUI.freeDayBody}
           </p>
         </div>
       ) : (
         <div className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-lg flex flex-col items-center gap-stack-sm text-center">
-          <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center">
-            <span
-              className="material-symbols-outlined text-3xl text-secondary"
-              style={{ fontVariationSettings: "'wght' 300" }}
+          {ageBandUI.emptyStateStyle === "illustrated-playful" ? (
+            /* Junior: book with sparkles */
+            <svg
+              viewBox="0 0 80 80"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-20 h-20"
               aria-hidden="true"
             >
-              edit_calendar
-            </span>
-          </div>
+              <rect x="14" y="17" width="9" height="46" rx="4" fill="var(--color-primary)"/>
+              <rect x="21" y="17" width="45" height="46" rx="4" fill="var(--color-primary-container)"/>
+              <rect x="30" y="29" width="28" height="3" rx="1.5" fill="var(--color-on-primary-container)" opacity="0.5"/>
+              <rect x="30" y="37" width="22" height="3" rx="1.5" fill="var(--color-on-primary-container)" opacity="0.5"/>
+              <rect x="30" y="45" width="26" height="3" rx="1.5" fill="var(--color-on-primary-container)" opacity="0.5"/>
+              <path d="M65 12 L66.6 17.2 L72.2 17.5 L68.1 21.3 L69.4 27 L65 24.1 L60.6 27 L61.9 21.3 L57.8 17.5 L63.4 17.2 Z" fill="var(--color-secondary)"/>
+              <circle cx="9" cy="38" r="3.5" fill="var(--color-tertiary)" opacity="0.65"/>
+              <circle cx="70" cy="53" r="2.5" fill="var(--color-primary)" opacity="0.4"/>
+            </svg>
+          ) : ageBandUI.emptyStateStyle === "illustrated-modern" ? (
+            /* Intermediate: stacked books */
+            <svg
+              viewBox="0 0 80 80"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-20 h-20"
+              aria-hidden="true"
+            >
+              <rect x="8" y="52" width="64" height="11" rx="4" fill="var(--color-secondary-container)"/>
+              <rect x="8" y="52" width="9" height="11" rx="4" fill="var(--color-secondary)" opacity="0.45"/>
+              <rect x="13" y="38" width="54" height="15" rx="4" fill="var(--color-primary-container)"/>
+              <rect x="13" y="38" width="9" height="15" rx="4" fill="var(--color-primary)" opacity="0.5"/>
+              <rect x="18" y="26" width="44" height="13" rx="4" fill="var(--color-primary)"/>
+              <path d="M67 20 L68.4 24.6 L73.3 24.9 L69.7 28.4 L70.8 33.4 L67 31 L63.2 33.4 L64.3 28.4 L60.7 24.9 L65.6 24.6 Z" fill="var(--color-secondary)"/>
+            </svg>
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center">
+              <span
+                className="material-symbols-outlined text-3xl text-secondary"
+                style={{ fontVariationSettings: "'wght' 300" }}
+                aria-hidden="true"
+              >
+                edit_calendar
+              </span>
+            </div>
+          )}
           <h2 className="font-headline-md text-headline-md text-on-surface">
-            No study plan yet
+            {ageBandUI.noSubjectsTitle}
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-sm">
-            Add your subjects and exam dates to generate your first plan.
+            {ageBandUI.noSubjectsBody}
           </p>
           <Link
             href="/subjects"
             className="font-label-md text-label-md bg-primary text-on-primary px-5 py-2 rounded-full mt-2"
           >
-            Add subjects
+            {ageBandUI.noSubjectsCta}
           </Link>
         </div>
       )}

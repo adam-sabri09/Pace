@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SubjectIntelligenceForm } from "./subject-intelligence-form";
 import { AddSubjectForm } from "./add-subject-form";
+import { DeleteSubjectButton } from "@/components/subjects/delete-subject-button";
 import type { Difficulty } from "@/lib/personalization/types";
+import { getAgeBandUI } from "@/lib/personalization/age-band";
 
 export default async function SubjectsPage() {
   const supabase = await createClient();
@@ -14,10 +16,12 @@ export default async function SubjectsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("session_length_minutes")
+    .select("session_length_minutes, age_band")
     .eq("id", user.id)
     .maybeSingle();
   if (profile?.session_length_minutes == null) redirect("/onboarding");
+
+  const ageBandUI = getAgeBandUI(profile?.age_band as string | null);
 
   const { data: subjects } = await supabase
     .from("subjects")
@@ -55,11 +59,17 @@ export default async function SubjectsPage() {
                   <h2 className="font-headline-md text-headline-md text-on-surface">
                     {s.name as string}
                   </h2>
-                  <span className="font-label-sm text-label-sm bg-secondary-container text-on-secondary-container px-2 py-1 rounded shrink-0">
-                    {s.exam_date
-                      ? `Exam ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${s.exam_date as string}T00:00:00Z`))}`
-                      : "No exam date"}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-label-sm text-label-sm bg-secondary-container text-on-secondary-container px-2 py-1 rounded">
+                      {s.exam_date
+                        ? `Exam ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(`${s.exam_date as string}T00:00:00Z`))}`
+                        : "No exam date"}
+                    </span>
+                    <DeleteSubjectButton
+                      subjectId={s.id as string}
+                      subjectName={s.name as string}
+                    />
+                  </div>
                 </div>
                 {topics.length > 0 ? (
                   <ul className="flex flex-col gap-2">
@@ -95,10 +105,10 @@ export default async function SubjectsPage() {
       ) : (
         <div className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-lg flex flex-col items-center gap-stack-sm text-center">
           <h2 className="font-headline-md text-headline-md text-on-surface">
-            No subjects yet
+            {ageBandUI.subjectsEmptyTitle}
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-sm">
-            Use the form above to add your first subject.
+            {ageBandUI.subjectsEmptyBody}
           </p>
         </div>
       )}

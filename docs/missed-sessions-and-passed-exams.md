@@ -104,6 +104,20 @@ The separation is deliberate: history is immutable (statuses move forward, never
 
 ---
 
+## Session State Transitions
+
+```mermaid
+stateDiagram-v2
+    [*] --> scheduled : Planner creates session
+    scheduled --> completed : Student marks done
+    scheduled --> missed : Auto-detect on page load\n(previous day, still scheduled)
+    scheduled --> missed : Student marks missed\n(triggers replan)
+    completed --> [*] : Preserved in history
+    missed --> [*] : Preserved in history
+```
+
+---
+
 ## Current Behavior Summary
 
 | Situation | What Pace does |

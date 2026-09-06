@@ -1142,7 +1142,7 @@ function DayRow({
             </button>
           </div>
         ))}
-        <AddWindowInline day={day} dispatch={dispatch} />
+        <AddWindowInline day={day} existingWindows={windows} dispatch={dispatch} />
       </div>
     </div>
   );
@@ -1150,9 +1150,11 @@ function DayRow({
 
 function AddWindowInline({
   day,
+  existingWindows,
   dispatch,
 }: {
   day: number;
+  existingWindows: AvailabilityWindowDraft[];
   dispatch: React.Dispatch<Action>;
 }) {
   const [startsAt, setStartsAt] = useState("16:00");
@@ -1167,6 +1169,12 @@ function AddWindowInline({
     });
     if (!parsed.success) {
       setLocalError(parsed.error.issues[0].message);
+      return;
+    }
+    // Check for overlaps against the existing windows on this day before dispatching.
+    const candidate = { dayOfWeek: day, startsAt, endsAt };
+    if (hasOverlappingWindows([...existingWindows, candidate])) {
+      setLocalError("This window overlaps an existing one.");
       return;
     }
     setLocalError(null);

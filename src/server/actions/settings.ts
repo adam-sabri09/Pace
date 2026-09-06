@@ -9,6 +9,7 @@ import {
   SESSION_LENGTHS,
   type SessionLength,
 } from "@/lib/validation/onboarding";
+import { revalidatePath } from "next/cache";
 import { rePlanForUser } from "@/server/actions/plan";
 
 export type SaveSettingsResult =
@@ -59,6 +60,8 @@ export async function saveAvailabilityAction(
 
   // Trigger a re-plan so the new windows take effect immediately.
   const replan = await rePlanForUser(supabase, user.id);
+  revalidatePath("/plan");
+  revalidatePath("/today");
   return { ok: true, replanned: replan.ok };
 }
 
@@ -80,5 +83,7 @@ export async function saveSessionLengthAction(
   if (error) return { ok: false, error: "Could not save session length." };
 
   const replan = await rePlanForUser(supabase, user.id);
+  revalidatePath("/plan");
+  revalidatePath("/today");
   return { ok: true, replanned: replan.ok };
 }

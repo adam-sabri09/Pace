@@ -63,6 +63,34 @@ export async function deletePassedExamsAction(): Promise<DeletePassedExamsResult
   return { ok: true, count: passedSubjects.length };
 }
 
+export type DeleteSubjectResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Permanently deletes a subject and all cascaded data (topics, sessions,
+ * practice history tied to those topics). This is irreversible — the caller
+ * must show a confirmation with a data-loss warning before invoking.
+ */
+export async function deleteSubjectAction(subjectId: string): Promise<DeleteSubjectResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You need to be signed in." };
+
+  const { error } = await supabase
+    .from("subjects")
+    .delete()
+    .eq("id", subjectId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, error: "Could not delete the subject. Try again." };
+
+  revalidatePath("/subjects");
+  revalidatePath("/plan");
+  revalidatePath("/today");
+  return { ok: true };
+}
+
 export type AddSubjectResult = { ok: true } | { ok: false; error: string };
 
 export async function addSubjectAction(raw: unknown): Promise<AddSubjectResult> {
@@ -113,5 +141,7 @@ export async function addSubjectAction(raw: unknown): Promise<AddSubjectResult> 
   }
 
   revalidatePath("/subjects");
+  revalidatePath("/plan");
+  revalidatePath("/today");
   return { ok: true };
 }

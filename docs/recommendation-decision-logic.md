@@ -6,6 +6,19 @@
 
 ## The Flow at a Glance
 
+```mermaid
+flowchart TD
+    A[Questionnaire<br/>6 answers] --> B[Scoring engine]
+    B --> C[Top technique]
+    B --> D[Confidence level<br/>high · medium · low]
+    E[Subject data<br/>difficulty · confidence% · exam date] --> F[Priority ranking]
+    F --> G[Top subject]
+    C --> H[Recommendation card]
+    D --> H
+    G --> H
+    H --> I[Subject + technique + duration<br/>rationale + session instruction]
+```
+
 ```
 Student data
   ├── Study style questionnaire (6 answers)

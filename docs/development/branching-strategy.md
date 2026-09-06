@@ -21,6 +21,27 @@ Slugs are lowercase, hyphen-separated, and describe intent: `feature/plan-genera
 5. Self-review the diff.
 6. Merge with **Squash and merge**. Delete the branch after.
 
+```mermaid
+gitGraph
+    commit id: "previous work"
+    branch feature/plan-generation
+    checkout feature/plan-generation
+    commit id: "implement F4.1"
+    commit id: "add tests"
+    checkout main
+    merge feature/plan-generation id: "squash merge"
+    branch fix/replan-race
+    checkout fix/replan-race
+    commit id: "guard concurrent replan"
+    checkout main
+    merge fix/replan-race id: "squash merge "
+    branch chore/upgrade-next
+    checkout chore/upgrade-next
+    commit id: "bump next@16"
+    checkout main
+    merge chore/upgrade-next id: "squash merge  "
+```
+
 ## Commit messages
 
 - One imperative sentence in the subject line, ≤ 72 chars.

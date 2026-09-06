@@ -7,6 +7,9 @@ import {
   type SubjectProgressData,
 } from "@/lib/progress";
 import { ClearPastExamsButton } from "@/components/plan/clear-past-exams-button";
+import { RePlanButton } from "@/components/plan/replan-button";
+import { DeleteSessionButton } from "@/components/plan/delete-session-button";
+import { getGoogleCalendarStatusAction } from "@/server/actions/google-calendar";
 
 /**
  * /plan — full timeline grouped by day (DESIGN-SPEC §3.8).
@@ -39,6 +42,7 @@ export default async function PlanPage() {
     { data: rawSubjects },
     { count: passedExamCount },
     { data: activePlan },
+    calendarStatus,
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -68,6 +72,8 @@ export default async function PlanPage() {
       .eq("user_id", user.id)
       .eq("is_active", true)
       .maybeSingle(),
+    // Calendar connection status for the connect CTA.
+    getGoogleCalendarStatusAction(),
   ]);
 
   // Transform raw Supabase rows (untyped) into the shape computeSubjectProgress expects.
@@ -164,9 +170,37 @@ export default async function PlanPage() {
               Your schedule, grouped by day.
             </p>
           </div>
-          <ClearPastExamsButton passedCount={passedExamCount ?? 0} />
+          <div className="flex flex-wrap items-center gap-2">
+            <RePlanButton />
+            <ClearPastExamsButton passedCount={passedExamCount ?? 0} />
+          </div>
         </div>
       </header>
+
+      {/* Google Calendar connect CTA — shown only when not yet connected */}
+      {!calendarStatus.connected && (
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary text-[24px]" aria-hidden="true">
+              calendar_month
+            </span>
+            <div>
+              <p className="font-label-md text-label-md text-on-surface">
+                Connect Google Calendar
+              </p>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                Pace avoids scheduling sessions when you&rsquo;re already busy.
+              </p>
+            </div>
+          </div>
+          <a
+            href="/api/google/calendar/auth"
+            className="font-label-sm text-label-sm bg-primary text-on-primary px-4 py-2 rounded-lg hover:opacity-90 transition-opacity shrink-0"
+          >
+            Connect
+          </a>
+        </div>
+      )}
 
       {/* Subject progress section */}
       <SubjectProgressSection subjects={subjectProgress} />
@@ -209,9 +243,14 @@ export default async function PlanPage() {
                             <div className="font-label-sm text-label-sm text-on-surface-variant">
                               {s.timeRange} · {s.durationMinutes} min
                             </div>
-                            <span className="font-label-sm text-label-sm bg-secondary-container text-on-secondary-container px-2 py-1 rounded shrink-0">
-                              {s.subjectName}
-                            </span>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className="font-label-sm text-label-sm bg-secondary-container text-on-secondary-container px-2 py-1 rounded">
+                                {s.subjectName}
+                              </span>
+                              {s.status === "scheduled" && (
+                                <DeleteSessionButton sessionId={s.id} />
+                              )}
+                            </div>
                           </div>
                           <h3
                             className={

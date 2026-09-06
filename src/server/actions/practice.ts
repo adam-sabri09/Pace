@@ -26,7 +26,7 @@ const PracticeQuestionSchema = z.object({
   questionType: z.enum([
     "recall", "understanding", "application",
     "comparison", "problem_solving", "find_mistake", "changed_detail",
-  ]),
+  ]).catch("recall"),
   conceptTested: z.string(),
   expectedAnswer: z.string(),
 });
@@ -92,6 +92,7 @@ const MAX_QUESTIONS = 10;
 
 export async function startPracticeAction(
   courseworkItemId: string,
+  requestedDifficulty: Difficulty = 2,
 ): Promise<StartPracticeResult> {
   const supabase = await createClient();
   const {
@@ -111,7 +112,9 @@ export async function startPracticeAction(
   }
 
   const extracted = item.extracted as CourseworkExtractedData;
-  const initialDifficulty: Difficulty = 2;
+  // Clamp to valid range in case the client sends an out-of-bounds value.
+  const initialDifficulty: Difficulty =
+    requestedDifficulty === 1 || requestedDifficulty === 3 ? requestedDifficulty : 2;
   const firstQuestion = await generateQuestion(extracted, initialDifficulty, 0);
   if (!firstQuestion) {
     return { ok: false, error: "Could not generate a question. Try again." };
@@ -249,8 +252,10 @@ export async function submitAnswerAction(
   const adjustment = adjustDifficulty(currentDifficulty, isCorrect, responseTimeMs);
   const nextDifficulty = adjustment.next;
 
-  // Persist attempt.
-  void supabase.from("practice_attempts").insert({
+  // Persist attempt — awaited so the record is committed before the response
+  // returns. A fire-and-forget void would race the serverless function teardown
+  // and silently drop the row, causing analytics to show zero data.
+  await supabase.from("practice_attempts").insert({
     practice_session_id: sessionId,
     user_id: user.id,
     question_text: currentQuestion.questionText,
@@ -275,7 +280,7 @@ export async function submitAnswerAction(
 
     const oldMastery = (existing?.mastery_pct as number | null) ?? 0;
     const newMastery = computeNewMastery(oldMastery, isCorrect);
-    void supabase.from("topic_mastery").upsert(
+    await supabase.from("topic_mastery").upsert(
       {
         user_id: user.id,
         topic_id: topicId,
@@ -536,7 +541,9 @@ Generate exactly ONE question. Return the question text, type, concept tested, a
       abortSignal: AbortSignal.timeout(20_000),
     });
     return object as StoredQuestion;
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await logAppError("practice_question_generation", msg, { difficulty, attemptCount }, undefined);
     return null;
   }
 }

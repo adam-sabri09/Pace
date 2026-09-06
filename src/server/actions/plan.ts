@@ -3,7 +3,9 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 
+import { createClient } from "@/lib/supabase/server";
 import { generatePlan } from "@/server/llm/generate";
 import type { PlanInput } from "@/server/llm/schema";
 import { checkPlanFeasibility } from "@/server/llm/validate";
@@ -386,12 +388,45 @@ export async function rePlanForUser(
     duration_minutes: s.durationMinutes,
     instruction: s.instruction,
   }));
+  // Guard against race condition: a topic deleted between buildPlanInput and the
+  // RPC would cause a FK violation. Re-verify all topicIds still exist first.
+  const topicIds = [...new Set(sessionsPayload.map((s) => s.topic_id as string))];
+  const { data: existingTopics } = await supabase
+    .from("topics")
+    .select("id")
+    .in("id", topicIds)
+    .eq("user_id", userId);
+  const existingIds = new Set((existingTopics ?? []).map((t) => t.id as string));
+  const missingIds = topicIds.filter((id) => !existingIds.has(id));
+  if (missingIds.length > 0) {
+    await logAppError(
+      "replan",
+      "Topic(s) deleted mid-replan — aborting RPC to avoid FK violation",
+      { missingIds, userId, planId },
+      userId,
+    );
+    return { ok: false, error: "A subject was modified while rebuilding your plan. Try again." };
+  }
+
   const { error: swapErr } = await supabase.rpc("pace_swap_scheduled_sessions", {
     p_user_id: userId,
     p_plan_id: planId,
     p_sessions: sessionsPayload,
   });
   if (swapErr) {
+    await logAppError(
+      "replan",
+      swapErr.message ?? "pace_swap_scheduled_sessions RPC failed",
+      {
+        code: swapErr.code,
+        details: swapErr.details,
+        hint: swapErr.hint,
+        userId,
+        planId,
+        sessionCount: sessionsPayload.length,
+      },
+      userId,
+    );
     return { ok: false, error: "Could not update your schedule. Try again." };
   }
 
@@ -419,4 +454,77 @@ export async function rePlanForUser(
   const diff = diffSessionsForOverlay(oldEntries, newEntries);
 
   return { ok: true, changes: diff.changes, warnings: generated.warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Public server action — callable from client components on /plan
+// ---------------------------------------------------------------------------
+
+/**
+ * Wraps rePlanForUser for use as a Next.js Server Action from the Plan page.
+ * Creates the Supabase client and resolves the current user before delegating.
+ */
+export async function triggerRePlanAction(): Promise<RePlanResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You need to be signed in." };
+  const result = await rePlanForUser(supabase, user.id);
+  if (result.ok) {
+    revalidatePath("/plan");
+    revalidatePath("/today");
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Delete a single scheduled session (F-delete)
+// ---------------------------------------------------------------------------
+
+export type DeleteSessionResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function deleteScheduledSessionAction(
+  sessionId: string,
+): Promise<DeleteSessionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You need to be signed in." };
+
+  // Verify the session exists, belongs to this user, and is still scheduled.
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("id, status")
+    .eq("id", sessionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!session) return { ok: false, error: "Session not found." };
+  if (session.status !== "scheduled") {
+    return { ok: false, error: "Only scheduled sessions can be deleted." };
+  }
+
+  const { error } = await supabase
+    .from("sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("user_id", user.id)
+    .eq("status", "scheduled");
+
+  if (error) {
+    await logAppError(
+      "delete_session",
+      error.message,
+      { code: error.code, details: error.details, sessionId },
+      user.id,
+    );
+    return { ok: false, error: "Could not delete the session. Try again." };
+  }
+
+  revalidatePath("/plan");
+  return { ok: true };
 }

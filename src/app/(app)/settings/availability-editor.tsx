@@ -16,6 +16,7 @@ import {
 } from "@/server/actions/settings";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_LABELS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SESSION_LENGTH_LABELS: Record<SessionLength, string> = {
   25: "25 min — short sprints",
   45: "45 min — balanced focus",
@@ -31,6 +32,134 @@ function windowsFromDb(rows: AvailabilityWindowInput[]): WindowDraft[] {
   return rows.map((w) => ({ ...w, clientId: cid() }));
 }
 
+// ---------------------------------------------------------------------------
+// Per-day section — shows existing windows and an inline add form
+// ---------------------------------------------------------------------------
+
+function DaySection({
+  day,
+  windows,
+  onAdd,
+  onRemove,
+}: {
+  day: number;
+  windows: WindowDraft[];
+  onAdd: (w: AvailabilityWindowInput) => void;
+  onRemove: (clientId: string) => void;
+}) {
+  const [startsAt, setStartsAt] = useState("16:00");
+  const [endsAt, setEndsAt] = useState("18:00");
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const handleAdd = () => {
+    const candidate = { dayOfWeek: day, startsAt, endsAt };
+    const parsed = AvailabilityWindowSchema.safeParse(candidate);
+    if (!parsed.success) {
+      setAddError(parsed.error.issues[0].message);
+      return;
+    }
+    // Check overlaps against existing windows on this day.
+    if (hasOverlappingWindows([...windows, candidate])) {
+      setAddError("This window overlaps an existing one on this day.");
+      return;
+    }
+    setAddError(null);
+    onAdd(candidate);
+  };
+
+  return (
+    <div
+      className={`p-3 rounded-lg border transition-colors ${
+        windows.length > 0
+          ? "border-primary/30 bg-surface-container"
+          : "border-outline-variant bg-surface"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span
+          className={`font-label-md text-label-md font-semibold uppercase tracking-wide ${
+            windows.length > 0 ? "text-primary" : "text-on-surface-variant"
+          }`}
+        >
+          {DAY_LABELS_FULL[day]}
+        </span>
+        {windows.length > 0 && (
+          <span className="font-label-sm text-label-sm text-on-surface-variant">
+            {windows.length} block{windows.length > 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Existing windows */}
+      {windows.length > 0 && (
+        <div className="flex flex-col gap-1.5 mb-2">
+          {windows.map((w) => (
+            <div
+              key={w.clientId}
+              className="flex items-center justify-between gap-3 bg-surface border border-outline-variant rounded-md px-3 py-1.5"
+            >
+              <span className="font-body-md text-body-md text-on-surface tabular-nums">
+                {w.startsAt} – {w.endsAt}
+              </span>
+              <button
+                type="button"
+                onClick={() => onRemove(w.clientId)}
+                className="text-on-surface-variant hover:text-error transition-colors"
+                aria-label={`Remove ${DAY_LABELS[day]} ${w.startsAt}–${w.endsAt}`}
+              >
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Inline add form */}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-0.5">
+          <span className="font-label-sm text-label-sm text-on-surface-variant">From</span>
+          <input
+            type="time"
+            value={startsAt}
+            onChange={(e) => setStartsAt(e.target.value)}
+            aria-label={`${DAY_LABELS_FULL[day]} start time`}
+            className="border border-outline-variant rounded-md px-2 py-1.5 bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:border-primary w-28"
+          />
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="font-label-sm text-label-sm text-on-surface-variant">To</span>
+          <input
+            type="time"
+            value={endsAt}
+            onChange={(e) => setEndsAt(e.target.value)}
+            aria-label={`${DAY_LABELS_FULL[day]} end time`}
+            className="border border-outline-variant rounded-md px-2 py-1.5 bg-surface text-on-surface font-body-md text-body-md focus:outline-none focus:border-primary w-28"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={handleAdd}
+          className="font-label-sm text-label-sm text-primary border border-primary/30 px-3 py-1.5 rounded-md hover:bg-primary/5 transition-colors flex items-center gap-1 self-end"
+        >
+          <span className="material-symbols-outlined text-[15px]" aria-hidden="true">add</span>
+          Add block
+        </button>
+      </div>
+      {addError && (
+        <p role="alert" className="font-body-sm text-body-sm text-error mt-1">
+          {addError}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main editor
+// ---------------------------------------------------------------------------
+
 export function AvailabilityEditor({
   initialWindows,
   initialSessionLength,
@@ -43,24 +172,21 @@ export function AvailabilityEditor({
   );
   const [sessionLength, setSessionLength] = useState<SessionLength>(initialSessionLength);
 
-  const [addDay, setAddDay] = useState<number>(1);
-  const [addStart, setAddStart] = useState("09:00");
-  const [addEnd, setAddEnd] = useState("11:00");
-  const [addError, setAddError] = useState<string | null>(null);
-
   const [availMsg, setAvailMsg] = useState<string | null>(null);
   const [lengthMsg, setLengthMsg] = useState<string | null>(null);
   const [isPendingAvail, startAvail] = useTransition();
   const [isPendingLength, startLength] = useTransition();
 
-  function handleAdd() {
-    const candidate = { dayOfWeek: addDay, startsAt: addStart, endsAt: addEnd };
-    const parsed = AvailabilityWindowSchema.safeParse(candidate);
-    if (!parsed.success) { setAddError(parsed.error.issues[0].message); return; }
-    const merged = [...windows, { ...candidate, clientId: cid() }];
-    if (hasOverlappingWindows(merged)) { setAddError("This window overlaps an existing one."); return; }
-    setAddError(null);
-    setWindows(merged);
+  const windowsByDay = DAYS_OF_WEEK.reduce(
+    (acc, d) => {
+      acc[d] = windows.filter((w) => w.dayOfWeek === d);
+      return acc;
+    },
+    {} as Record<number, WindowDraft[]>,
+  );
+
+  function handleAdd(w: AvailabilityWindowInput) {
+    setWindows((prev) => [...prev, { ...w, clientId: cid() }]);
   }
 
   function handleRemove(clientId: string) {
@@ -85,14 +211,6 @@ export function AvailabilityEditor({
     });
   }
 
-  const windowsByDay = DAYS_OF_WEEK.reduce(
-    (acc, d) => {
-      acc[d] = windows.filter((w) => w.dayOfWeek === d);
-      return acc;
-    },
-    {} as Record<number, WindowDraft[]>,
-  );
-
   return (
     <div className="flex flex-col gap-stack-md">
       {/* Availability */}
@@ -104,109 +222,39 @@ export function AvailabilityEditor({
           Weekly availability
         </h2>
 
-        <div className="flex flex-col gap-4">
-          {/* Existing windows */}
+        <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">
+          Add one or more study blocks per day. Pace schedules sessions inside each block — it
+          never merges separate blocks into one.
+        </p>
+
+        <div className="flex flex-col gap-3">
           {DAYS_OF_WEEK.map((d) => (
-            <div key={d}>
-              <p className="font-label-md text-label-md text-on-surface-variant mb-1.5">
-                {DAY_LABELS[d]}
-              </p>
-              {windowsByDay[d].length === 0 ? (
-                <p className="font-body-sm text-body-sm text-on-surface-variant italic">
-                  No windows
-                </p>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {windowsByDay[d].map((w) => (
-                    <div
-                      key={w.clientId}
-                      className="flex items-center justify-between gap-3 bg-surface-container border border-outline-variant rounded-lg px-3 py-2"
-                    >
-                      <span className="font-body-md text-body-md text-on-surface">
-                        {w.startsAt} – {w.endsAt}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(w.clientId)}
-                        className="text-on-surface-variant hover:text-error transition-colors"
-                        aria-label={`Remove ${DAY_LABELS[d]} ${w.startsAt}–${w.endsAt}`}
-                      >
-                        <span className="material-symbols-outlined text-base" aria-hidden="true">
-                          close
-                        </span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <DaySection
+              key={d}
+              day={d}
+              windows={windowsByDay[d]}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+            />
           ))}
+        </div>
 
-          {/* Add window form */}
-          <div className="border-t border-outline-variant pt-4 flex flex-col gap-3">
-            <p className="font-label-md text-label-md text-on-surface">Add a window</p>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Day</span>
-                <select
-                  value={addDay}
-                  onChange={(e) => setAddDay(Number(e.target.value))}
-                  className="border border-outline-variant rounded-lg px-3 py-2 bg-surface text-on-surface font-body-md text-body-md"
-                >
-                  {DAYS_OF_WEEK.map((d) => (
-                    <option key={d} value={d}>{DAY_LABELS[d]}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">Start</span>
-                <input
-                  type="time"
-                  value={addStart}
-                  onChange={(e) => setAddStart(e.target.value)}
-                  className="border border-outline-variant rounded-lg px-3 py-2 bg-surface text-on-surface font-body-md text-body-md"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="font-label-sm text-label-sm text-on-surface-variant">End</span>
-                <input
-                  type="time"
-                  value={addEnd}
-                  onChange={(e) => setAddEnd(e.target.value)}
-                  className="border border-outline-variant rounded-lg px-3 py-2 bg-surface text-on-surface font-body-md text-body-md"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={handleAdd}
-                className="font-label-md text-label-md text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/5 transition-colors"
-              >
-                Add
-              </button>
-            </div>
-            {addError && (
-              <p className="font-body-sm text-body-sm text-error">{addError}</p>
-            )}
-          </div>
-
-          {/* Save button */}
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={handleSaveAvailability}
-              disabled={isPendingAvail}
-              className="font-label-md text-label-md bg-primary text-on-primary px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60"
+        <div className="flex items-center gap-4 mt-stack-md">
+          <button
+            type="button"
+            onClick={handleSaveAvailability}
+            disabled={isPendingAvail}
+            className="font-label-md text-label-md bg-primary text-on-primary px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60"
+          >
+            {isPendingAvail ? "Saving…" : "Save availability"}
+          </button>
+          {availMsg && (
+            <p
+              className={`font-body-sm text-body-sm ${availMsg.startsWith("Saved") ? "text-secondary" : "text-error"}`}
             >
-              {isPendingAvail ? "Saving…" : "Save availability"}
-            </button>
-            {availMsg && (
-              <p
-                className={`font-body-sm text-body-sm ${availMsg.startsWith("Saved") ? "text-secondary" : "text-error"}`}
-              >
-                {availMsg}
-              </p>
-            )}
-          </div>
+              {availMsg}
+            </p>
+          )}
         </div>
       </section>
 

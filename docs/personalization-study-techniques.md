@@ -128,6 +128,19 @@ When a student skips the questionnaire:
 
 The scoring is fully deterministic — no LLM, no randomness. See `src/lib/personalization/scoring.ts` for the implementation.
 
+```mermaid
+flowchart LR
+    A[6 questionnaire\nanswers] --> B[Scoring engine\n7 techniques × signal weights]
+    B --> C[Normalised scores\n0–100 per technique]
+    C --> D[Top technique]
+    C --> E[Confidence level\nhigh · medium · low]
+    F[Subject data\ndifficulty · confidence%\nexam date] --> G[Priority ranking]
+    G --> H[Top subject]
+    D --> I[Recommendation]
+    E --> I
+    H --> I
+```
+
 **Process:**
 1. Each of the 6 answers contributes a non-negative integer weight toward each of the 7 techniques.
 2. Raw points are summed per technique.
