@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { deleteSubjectAction } from "@/server/actions/subjects";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function DeleteSubjectButton({ subjectId, subjectName }: Props) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +21,10 @@ export function DeleteSubjectButton({ subjectId, subjectName }: Props) {
       if (!res.ok) {
         setError(res.error);
         setConfirmOpen(false);
+      } else {
+        setConfirmOpen(false);
+        router.refresh();
       }
-      // On success the page revalidates — the subject disappears from the list.
     });
   };
 

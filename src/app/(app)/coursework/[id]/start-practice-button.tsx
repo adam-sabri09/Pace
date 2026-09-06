@@ -21,14 +21,22 @@ export function StartPracticeButton({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isPersisting, startPersistTransition] = useTransition();
   const [difficulty, setDifficulty] = useState<Difficulty>(initialDifficulty);
 
   const difficultyLabel = DIFFICULTIES.find((d) => d.value === difficulty)?.label ?? "Medium";
 
+  function handleDifficultyChange(d: Difficulty) {
+    setDifficulty(d);
+    // Persist immediately so the selection survives page revisits.
+    // Non-fatal: if this fails, practice still starts with the locally selected value.
+    startPersistTransition(async () => {
+      await updateCourseworkDifficultyAction(courseworkItemId, d);
+    });
+  }
+
   function handleClick() {
     startTransition(async () => {
-      // Persist the chosen difficulty non-fatally — practice still starts if this fails.
-      await updateCourseworkDifficultyAction(courseworkItemId, difficulty);
       const result = await startPracticeAction(courseworkItemId, difficulty);
       if (!result.ok) {
         alert(result.error);
@@ -52,13 +60,14 @@ export function StartPracticeButton({
           <button
             key={d.value}
             type="button"
-            onClick={() => setDifficulty(d.value)}
+            onClick={() => handleDifficultyChange(d.value)}
+            disabled={isPending}
             aria-pressed={difficulty === d.value}
             className={`font-label-sm text-label-sm px-3 py-1 rounded-full border transition-colors ${
               difficulty === d.value
                 ? "bg-primary text-on-primary border-primary"
                 : "bg-transparent text-on-surface-variant border-outline-variant hover:border-primary/50 hover:text-on-surface"
-            }`}
+            } disabled:opacity-50`}
           >
             {d.label}
           </button>
@@ -69,7 +78,7 @@ export function StartPracticeButton({
       </p>
       <button
         onClick={handleClick}
-        disabled={isPending}
+        disabled={isPending || isPersisting}
         className="px-8 py-3 font-label-lg text-label-lg bg-primary text-on-primary rounded-full disabled:opacity-50 transition-opacity"
       >
         {isPending ? "Starting…" : "Practice now"}
