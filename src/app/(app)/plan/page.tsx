@@ -177,30 +177,55 @@ export default async function PlanPage() {
         </div>
       </header>
 
-      {/* Google Calendar connect CTA — shown only when not yet connected */}
-      {!calendarStatus.connected && (
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-primary text-[24px]" aria-hidden="true">
-              calendar_month
-            </span>
-            <div>
-              <p className="font-label-md text-label-md text-on-surface">
-                Connect Google Calendar
-              </p>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Pace avoids scheduling sessions when you&rsquo;re already busy.
-              </p>
-            </div>
+      {/* Google Calendar section — always visible so users can connect or manage */}
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="material-symbols-outlined text-primary text-[24px]" aria-hidden="true">
+            calendar_month
+          </span>
+          <div>
+            {calendarStatus.connected ? (
+              <>
+                <p className="font-label-md text-label-md text-on-surface">
+                  Google Calendar connected
+                  {calendarStatus.email && (
+                    <span className="ml-1 font-body-sm text-body-sm text-on-surface-variant">
+                      ({calendarStatus.email})
+                    </span>
+                  )}
+                </p>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Pace avoids scheduling sessions when you&rsquo;re already busy.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-label-md text-label-md text-on-surface">
+                  Connect Google Calendar
+                </p>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Pace avoids scheduling sessions when you&rsquo;re already busy.
+                </p>
+              </>
+            )}
           </div>
+        </div>
+        {calendarStatus.connected ? (
+          <a
+            href="/settings"
+            className="font-label-sm text-label-sm text-on-surface-variant border border-outline-variant px-4 py-2 rounded-lg hover:bg-surface-container transition-colors shrink-0"
+          >
+            Manage
+          </a>
+        ) : (
           <a
             href="/api/google/calendar/auth"
             className="font-label-sm text-label-sm bg-primary text-on-primary px-4 py-2 rounded-lg hover:opacity-90 transition-opacity shrink-0"
           >
             Connect
           </a>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Subject progress section */}
       <SubjectProgressSection subjects={subjectProgress} />

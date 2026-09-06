@@ -5,8 +5,6 @@ import "server-only";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
-
 import { createClient } from "@/lib/supabase/server";
 import { logAppError } from "@/lib/errors/log-error";
 
@@ -288,7 +286,9 @@ export async function updateCourseworkDifficultyAction(
     return { ok: false, error: "Could not save difficulty. Try again." };
   }
 
-  revalidatePath(`/coursework/${itemId}`);
+  // No revalidatePath here — the page does not need a server refresh.
+  // The visual state is owned by the client's useState; this write only
+  // persists the selection so future visits start at the right difficulty.
   return { ok: true };
 }
 
