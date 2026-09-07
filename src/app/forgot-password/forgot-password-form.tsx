@@ -16,8 +16,12 @@ export function ForgotPasswordForm() {
   return (
     <main className="min-h-full flex-grow flex items-center justify-center px-container-margin py-stack-lg">
       <div className="w-full max-w-md flex flex-col gap-stack-lg">
-        <header className="flex flex-col items-center gap-base text-center">
-          <span className="font-display text-headline-md text-primary">Pace</span>
+        <header className="flex flex-col items-center gap-3 text-center">
+          <div className="flex items-center gap-2.5 mb-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/pace-icon.svg" alt="" width={32} height={32} className="rounded-lg" aria-hidden="true" />
+            <span className="font-display text-headline-md text-primary">Pace</span>
+          </div>
           <h1 className="font-display text-headline-lg-mobile md:text-headline-lg text-on-surface">
             Reset your password
           </h1>
@@ -80,7 +84,7 @@ export function ForgotPasswordForm() {
               type="submit"
               disabled={pending}
               aria-busy={pending}
-              className="bg-primary-container text-on-primary font-label-md text-label-md px-8 py-3 rounded-lg hover:opacity-90 transition-opacity shadow-sm disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+              className="bg-primary text-on-primary font-label-md text-label-md px-8 py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             >
               {pending ? "Sending…" : "Send reset link"}
             </button>

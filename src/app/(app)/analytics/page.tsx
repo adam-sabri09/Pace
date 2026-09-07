@@ -137,7 +137,7 @@ export default async function AnalyticsPage() {
           </p>
           <Link
             href="/coursework"
-            className="bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-full"
+            className="bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-lg"
           >
             Go to Coursework
           </Link>

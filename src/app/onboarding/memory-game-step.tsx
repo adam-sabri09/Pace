@@ -315,7 +315,7 @@ export function MemoryGameStep({ onScore }: Props) {
             </span>
             <div className="flex-grow h-1 bg-surface-container-highest rounded-full overflow-hidden">
               <div
-                className="h-full bg-primary-container rounded-full transition-all duration-300"
+                className="h-full bg-primary rounded-full transition-all duration-300"
                 style={{ width: `${((currentQ + 1) / QUESTIONS.length) * 100}%` }}
               />
             </div>

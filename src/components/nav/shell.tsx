@@ -47,9 +47,13 @@ export function SideNav({ isAdmin }: { isAdmin?: boolean }) {
       className="hidden md:flex flex-col fixed left-0 top-0 h-full pt-stack-lg px-gutter w-64 bg-surface border-r border-outline-variant z-40"
     >
       <div className="mb-stack-lg px-2">
-        <span className="font-display text-headline-md text-primary block">Pace</span>
+        <div className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/pace-icon.svg" alt="" width={28} height={28} className="rounded flex-shrink-0" aria-hidden="true" />
+          <span className="font-display text-headline-md text-primary">Pace</span>
+        </div>
       </div>
-      <ul className="flex flex-col gap-base">
+      <ul className="flex flex-col gap-1">
         {items.map((item) => {
           const active = isActive(pathname, item.href);
           return (
@@ -58,20 +62,20 @@ export function SideNav({ isAdmin }: { isAdmin?: boolean }) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={
-                  "flex items-center gap-gutter px-4 py-3 rounded-lg transition-all " +
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors " +
                   (active
-                    ? "text-primary font-bold bg-secondary-container"
-                    : "text-on-surface-variant hover:bg-surface-container-low")
+                    ? "text-primary bg-secondary-container"
+                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface")
                 }
               >
                 <span
-                  className="material-symbols-outlined"
-                  style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                  className="material-symbols-outlined text-[20px] flex-shrink-0"
+                  style={active ? { fontVariationSettings: "'FILL' 1, 'wght' 500" } : { fontVariationSettings: "'wght' 300" }}
                   aria-hidden="true"
                 >
                   {item.icon}
                 </span>
-                <span className="font-label-md text-label-md">{item.label}</span>
+                <span className={`font-label-md text-label-md ${active ? "font-semibold" : ""}`}>{item.label}</span>
               </Link>
             </li>
           );
@@ -85,22 +89,26 @@ export function TopAppBar() {
   const pathname = usePathname();
   const settingsActive = pathname === "/settings";
   return (
-    <header className="md:hidden fixed top-0 left-0 w-full bg-surface border-b border-outline-variant px-container-margin py-base z-40 flex items-center justify-between">
-      <span className="font-display text-headline-md text-primary">Pace</span>
+    <header className="md:hidden fixed top-0 left-0 w-full bg-surface border-b border-outline-variant px-container-margin z-40 flex items-center justify-between h-14">
+      <div className="flex items-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/pace-icon.svg" alt="" width={22} height={22} className="rounded flex-shrink-0" aria-hidden="true" />
+        <span className="font-display text-headline-md text-primary">Pace</span>
+      </div>
       <Link
         href="/settings"
         aria-label="Settings"
         aria-current={settingsActive ? "page" : undefined}
         className={
-          "p-1 rounded-full transition-colors " +
+          "p-2 rounded-lg transition-colors " +
           (settingsActive
             ? "text-primary bg-secondary-container"
             : "text-on-surface-variant hover:bg-surface-container-low")
         }
       >
         <span
-          className="material-symbols-outlined"
-          style={settingsActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
+          className="material-symbols-outlined text-[20px]"
+          style={settingsActive ? { fontVariationSettings: "'FILL' 1, 'wght' 500" } : { fontVariationSettings: "'wght' 300" }}
           aria-hidden="true"
         >
           settings
@@ -118,7 +126,7 @@ export function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-2 md:hidden bg-surface border-t border-outline-variant z-50 pb-safe"
+      className="fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-1 md:hidden bg-surface border-t border-outline-variant z-50 pb-safe"
     >
       {items.map((item) => {
         const active = isActive(pathname, item.href);
@@ -128,21 +136,18 @@ export function BottomNav({ isAdmin }: { isAdmin?: boolean }) {
             href={item.href}
             aria-label={item.label}
             aria-current={active ? "page" : undefined}
-            className={
-              "flex flex-col items-center justify-center px-4 py-1 transition-transform duration-150 " +
-              (active
-                ? "bg-secondary-container text-on-secondary-container rounded-full scale-95"
-                : "text-on-surface-variant hover:bg-surface-container-low rounded-full")
-            }
+            className="flex flex-col items-center justify-center min-w-[56px] py-2 gap-0.5"
           >
             <span
-              className="material-symbols-outlined"
-              style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}
+              className={`material-symbols-outlined text-[22px] transition-colors ${active ? "text-primary" : "text-on-surface-variant"}`}
+              style={active ? { fontVariationSettings: "'FILL' 1, 'wght' 500" } : { fontVariationSettings: "'wght' 300" }}
               aria-hidden="true"
             >
               {item.icon}
             </span>
-            <span className="font-label-sm text-label-sm mt-1">{item.label}</span>
+            <span className={`font-label-sm text-label-sm transition-colors ${active ? "text-primary font-semibold" : "text-on-surface-variant"}`}>
+              {item.label}
+            </span>
           </Link>
         );
       })}

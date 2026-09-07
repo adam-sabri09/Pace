@@ -382,7 +382,7 @@ export function Wizard() {
         </div>
         <div className="w-full h-1 bg-surface-container-highest rounded-full overflow-hidden">
           <div
-            className="h-full bg-primary-container rounded-full transition-all duration-500 ease-out"
+            className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
             style={{ width: `${progressPct}%` }}
           />
         </div>
@@ -447,7 +447,7 @@ export function Wizard() {
               type="button"
               onClick={goNext}
               disabled={isPending}
-              className="bg-primary-container text-on-primary font-label-md text-label-md px-6 py-3 rounded-lg hover:opacity-90 transition-opacity shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="bg-primary text-on-primary font-label-md text-label-md px-6 py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Continue
             </button>
@@ -463,11 +463,11 @@ export function Wizard() {
 // -----------------------------------------------------------------------------
 
 const AGE_BAND_ICONS: Record<AgeBand, string> = {
-  junior: "🎒",
-  intermediate: "📚",
-  senior: "🎓",
-  university: "🏛️",
-  adult: "💼",
+  junior: "backpack",
+  intermediate: "menu_book",
+  senior: "school",
+  university: "account_balance",
+  adult: "work",
 };
 
 function AgeBandStep({
@@ -506,7 +506,11 @@ function AgeBandStep({
                   : "border-outline-variant hover:border-primary",
               ].join(" ")}
             >
-              <span className="text-3xl" aria-hidden="true">
+              <span
+                className="material-symbols-outlined text-[28px] text-on-surface-variant shrink-0"
+                style={{ fontVariationSettings: "'FILL' 0, 'wght' 300" }}
+                aria-hidden="true"
+              >
                 {AGE_BAND_ICONS[band]}
               </span>
               <span className="font-body-lg text-body-lg text-on-surface">
@@ -597,7 +601,7 @@ function SubjectsStep({
           type="button"
           onClick={() => addFromDraft(draft)}
           aria-label="Add subject"
-          className="absolute right-0 bottom-2 text-primary-container hover:text-primary p-2 rounded-full hover:bg-surface-container-low transition-colors"
+          className="absolute right-0 bottom-2 text-outline-variant hover:text-primary p-2 rounded-full hover:bg-surface-container-low transition-colors"
         >
           <span className="material-symbols-outlined">add</span>
         </button>

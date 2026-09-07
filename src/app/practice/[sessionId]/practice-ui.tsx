@@ -216,7 +216,7 @@ export function PracticeUI({
               <button
                 type="submit"
                 disabled={isPending || !answer.trim()}
-                className="self-end bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-full disabled:opacity-50 transition-opacity"
+                className="self-end bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-lg disabled:opacity-50 transition-opacity"
               >
                 {isPending ? "Checking…" : "Submit answer"}
               </button>
@@ -262,7 +262,7 @@ export function PracticeUI({
               <button
                 onClick={generationFailed ? handleRetryGeneration : handleContinue}
                 disabled={isPending}
-                className="self-end bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-full disabled:opacity-50 transition-opacity"
+                className="self-end bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-lg disabled:opacity-50 transition-opacity"
               >
                 {isPending ? "Loading…" : generationFailed ? "Try again" : "Next question"}
               </button>
@@ -324,13 +324,13 @@ function CompletionScreen({
       <div className="flex gap-3 flex-wrap justify-center">
         <button
           onClick={onRestart}
-          className="bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-full"
+          className="bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-lg"
         >
           More coursework
         </button>
         <button
           onClick={onGoToToday}
-          className="border border-outline-variant text-on-surface font-label-lg text-label-lg px-6 py-2.5 rounded-full hover:bg-surface-container-low transition-colors"
+          className="border border-outline-variant text-on-surface font-label-lg text-label-lg px-6 py-2.5 rounded-lg hover:bg-surface-container-low transition-colors"
         >
           Back to Today
         </button>

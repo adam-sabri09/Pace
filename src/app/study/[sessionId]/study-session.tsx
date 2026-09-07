@@ -382,7 +382,7 @@ export function StudySession({
               className={
                 "inline-flex items-center gap-1 font-label-sm text-label-sm transition-colors px-3 py-1.5 rounded-lg border " +
                 (strictMode
-                  ? "bg-primary-container text-on-primary border-primary/30"
+                  ? "bg-primary text-on-primary border-primary"
                   : "text-on-surface-variant border-outline-variant hover:bg-surface-variant")
               }
             >
@@ -522,7 +522,7 @@ export function StudySession({
                 <button
                   type="button"
                   onClick={handleDone}
-                  className="flex-1 bg-primary-container text-on-primary font-label-md text-label-md px-4 py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  className="flex-1 bg-primary text-on-primary font-label-md text-label-md px-4 py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                 >
                   <span
                     className="material-symbols-outlined text-[18px]"

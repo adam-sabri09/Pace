@@ -6,59 +6,65 @@
  * text-headline-lg, p-stack-md, rounded-xl, etc.
  */
 @theme {
-  /* --- Color palette (Material 3 tonal system) --- */
-  --color-background: #fbf8ff;
-  --color-surface: #fbf8ff;
-  --color-surface-bright: #fbf8ff;
-  --color-surface-dim: #d7d8f4;
+  /* --- Color palette --- */
+  /* Background/surface: warm paper neutrals — no lavender tint */
+  --color-background: #f5f4f1;
+  --color-surface: #ffffff;
+  --color-surface-bright: #ffffff;
+  --color-surface-dim: #e5e4df;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f4f2ff;
-  --color-surface-container: #edecff;
-  --color-surface-container-high: #e6e6ff;
-  --color-surface-container-highest: #e0e0fc;
-  --color-surface-variant: #e0e0fc;
-  --color-surface-tint: #45664b;
-  --color-inverse-surface: #2d2f44;
-  --color-inverse-on-surface: #f1efff;
+  --color-surface-container-low: #eeede8;
+  --color-surface-container: #e8e7e2;
+  --color-surface-container-high: #e2e1dc;
+  --color-surface-container-highest: #dddcd7;
+  --color-surface-variant: #d6d5d0;
+  --color-surface-tint: #23422a;
+  --color-inverse-surface: #2c2d28;
+  --color-inverse-on-surface: #f5f4f1;
 
+  /* Primary: forest green brand */
   --color-primary: #23422a;
   --color-on-primary: #ffffff;
-  --color-primary-container: #3a5a40;
-  --color-on-primary-container: #acd0af;
-  --color-primary-fixed: #c7ecca;
-  --color-primary-fixed-dim: #abd0af;
-  --color-on-primary-fixed: #02210c;
-  --color-on-primary-fixed-variant: #2e4e35;
-  --color-inverse-primary: #abd0af;
+  --color-primary-container: #d4ebd6;
+  --color-on-primary-container: #092910;
+  --color-primary-fixed: #d4ebd6;
+  --color-primary-fixed-dim: #b0d3b4;
+  --color-on-primary-fixed: #011508;
+  --color-on-primary-fixed-variant: #2a4831;
+  --color-inverse-primary: #a8cdb0;
 
-  --color-secondary: #5c6145;
+  /* Secondary: warm olive — nav active, subject chips */
+  --color-secondary: #4a5240;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #e1e6c2;
-  --color-on-secondary-container: #62674a;
-  --color-secondary-fixed: #e1e6c2;
-  --color-secondary-fixed-dim: #c5c9a7;
-  --color-on-secondary-fixed: #1a1d07;
-  --color-on-secondary-fixed-variant: #45492f;
+  --color-secondary-container: #d8e5d4;
+  --color-on-secondary-container: #3a4232;
+  --color-secondary-fixed: #d8e5d4;
+  --color-secondary-fixed-dim: #bccdb7;
+  --color-on-secondary-fixed: #171f10;
+  --color-on-secondary-fixed-variant: #3a4232;
 
-  --color-tertiary: #593038;
+  /* Tertiary: muted rose — urgent states */
+  --color-tertiary: #6d4155;
   --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #73464f;
-  --color-on-tertiary-container: #f3b7c1;
-  --color-tertiary-fixed: #ffd9df;
-  --color-tertiary-fixed-dim: #f3b7c1;
-  --color-on-tertiary-fixed: #321019;
-  --color-on-tertiary-fixed-variant: #653a43;
+  --color-tertiary-container: #f5d8e6;
+  --color-on-tertiary-container: #4a1930;
+  --color-tertiary-fixed: #f5d8e6;
+  --color-tertiary-fixed-dim: #e4b8cc;
+  --color-on-tertiary-fixed: #2b0e20;
+  --color-on-tertiary-fixed-variant: #553040;
 
-  --color-error: #ba1a1a;
+  /* Error */
+  --color-error: #b3261e;
   --color-on-error: #ffffff;
-  --color-error-container: #ffdad6;
-  --color-on-error-container: #93000a;
+  --color-error-container: #f9dedc;
+  --color-on-error-container: #8c1d18;
 
-  --color-on-background: #181a2e;
-  --color-on-surface: #181a2e;
-  --color-on-surface-variant: #424842;
-  --color-outline: #727971;
-  --color-outline-variant: #c2c8bf;
+  /* Text — warm near-black, green-tinted variant */
+  --color-on-background: #191918;
+  --color-on-surface: #191918;
+  --color-on-surface-variant: #48504a;
+  --color-outline: #797c75;
+  --color-outline-variant: #c5c9be;
 
   /* --- Typography (Hanken Grotesk) --- */
   --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;

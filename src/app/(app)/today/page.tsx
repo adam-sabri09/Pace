@@ -462,7 +462,7 @@ export default async function TodayPage() {
             </p>
             {studyStreak >= ageBandUI.streakMinForBadge && (
               <span
-                className={`streak-badge font-label-sm text-label-sm bg-secondary/10 text-secondary border border-secondary/20 rounded-full px-2 py-0.5 ${
+                className={`streak-badge inline-flex items-center gap-1 font-label-sm text-label-sm bg-secondary/10 text-secondary border border-secondary/20 rounded-full px-2 py-0.5 ${
                   ageBandUI.streakBadgeStyle === "fire-animated" || ageBandUI.streakBadgeStyle === "energetic" ? "font-semibold" : ""
                 }`}
                 title={`${studyStreak}-day study streak`}
@@ -470,12 +470,17 @@ export default async function TodayPage() {
                 {ageBandUI.streakBadgeStyle === "fire-animated"
                   ? (
                     <>
-                      <span className="streak-fire" aria-hidden="true">🔥</span>
-                      {` ${studyStreak} day streak!`}
+                      <span className="material-symbols-outlined streak-fire text-[14px]" aria-hidden="true" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
+                      {`${studyStreak} day streak`}
                     </>
                   )
                   : ageBandUI.streakBadgeStyle === "energetic"
-                  ? `⚡ ${studyStreak} day streak!`
+                  ? (
+                    <>
+                      <span className="material-symbols-outlined text-[14px]" aria-hidden="true" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+                      {`${studyStreak} day streak`}
+                    </>
+                  )
                   : `${studyStreak} day streak`}
               </span>
             )}
@@ -570,7 +575,7 @@ export default async function TodayPage() {
           </div>
           <Link
             href={`/coursework/${topReadyCoursework.id as string}`}
-            className="shrink-0 bg-primary text-on-primary font-label-md text-label-md px-4 py-2 rounded-full"
+            className="shrink-0 bg-primary text-on-primary font-label-md text-label-md px-4 py-2 rounded-lg"
           >
             Start
           </Link>
@@ -586,16 +591,21 @@ export default async function TodayPage() {
 
       {ageBandUI.showStreakMilestone && [7, 14, 21, 30].includes(studyStreak) && (
         <div className="milestone-banner rounded-xl border border-secondary/25 bg-secondary/5 px-5 py-4">
-          <p className="font-headline-md text-headline-md text-secondary">
-            {studyStreak === 7
-              ? "🌟 7-day streak — great consistency!"
-              : studyStreak === 14
-              ? "🔥 Two-week streak — you're building something!"
-              : studyStreak === 21
-              ? "💪 Three weeks straight — incredible!"
-              : "🏆 30-day streak — that's commitment!"}
-          </p>
-          <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="material-symbols-outlined text-secondary text-[20px]" aria-hidden="true" style={{ fontVariationSettings: "'FILL' 1" }}>
+              {studyStreak === 7 ? "stars" : studyStreak === 14 ? "local_fire_department" : studyStreak === 21 ? "fitness_center" : "emoji_events"}
+            </span>
+            <p className="font-headline-md text-headline-md text-secondary">
+              {studyStreak === 7
+                ? "7-day streak — great consistency!"
+                : studyStreak === 14
+                ? "Two-week streak — you're building something!"
+                : studyStreak === 21
+                ? "Three weeks straight — incredible!"
+                : "30-day streak — that's commitment!"}
+            </p>
+          </div>
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
             Keep going — small sessions every day add up.
           </p>
         </div>
@@ -783,7 +793,7 @@ export default async function TodayPage() {
           </p>
           <Link
             href="/subjects"
-            className="font-label-md text-label-md bg-primary text-on-primary px-5 py-2 rounded-full mt-2"
+            className="font-label-md text-label-md bg-primary text-on-primary px-5 py-2 rounded-lg mt-2"
           >
             {ageBandUI.noSubjectsCta}
           </Link>

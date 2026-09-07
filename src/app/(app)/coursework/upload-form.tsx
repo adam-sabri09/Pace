@@ -84,7 +84,7 @@ export function CourseworkUploadForm() {
       <button
         type="submit"
         disabled={isPending || !fileName}
-        className="self-start bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-full disabled:opacity-50 transition-opacity"
+        className="self-start bg-primary text-on-primary font-label-lg text-label-lg px-6 py-2.5 rounded-lg disabled:opacity-50 transition-opacity"
       >
         {isPending ? "Extracting content…" : "Upload and analyse"}
       </button>

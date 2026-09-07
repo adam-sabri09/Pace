@@ -74,13 +74,16 @@ export function SessionCard({
   };
 
   const containerCls =
-    "bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden relative" +
-    (isDone || isMissed ? " opacity-70" : "");
+    "bg-surface border border-outline-variant rounded-lg overflow-hidden relative" +
+    (isDone || isMissed ? " opacity-60" : "");
 
   return (
     <>
     <article className={containerCls} data-testid="session-card" data-status={status}>
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-outline-variant" aria-hidden="true" />
+      <div
+        className={`absolute left-0 top-0 bottom-0 w-[3px] ${isActive ? "bg-primary" : isDone ? "bg-secondary" : "bg-outline-variant"}`}
+        aria-hidden="true"
+      />
       <div className="flex flex-col sm:flex-row sm:items-center">
         <div className="flex-1 p-4 pl-6 flex flex-col sm:flex-row gap-3 sm:gap-6 sm:items-center">
           <div className="flex flex-col gap-1 sm:w-36 shrink-0">
@@ -143,7 +146,7 @@ export function SessionCard({
                 onClick={runMarkDone}
                 disabled={isPending}
                 aria-busy={isPending}
-                className="flex-1 px-3 py-2 font-label-sm text-label-sm bg-primary-container text-on-primary rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                className="flex-1 px-3 py-2 font-label-sm text-label-sm bg-primary text-on-primary rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
               >
                 <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                   check_circle

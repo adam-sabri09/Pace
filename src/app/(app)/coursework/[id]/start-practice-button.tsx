@@ -61,7 +61,7 @@ export function StartPracticeButton({
             onClick={() => handleDifficultyChange(d.value)}
             disabled={isPending}
             aria-pressed={difficulty === d.value}
-            className={`font-label-sm text-label-sm px-3 py-1 rounded-full border transition-colors ${
+            className={`font-label-sm text-label-sm px-3 py-1 rounded-md border transition-colors ${
               difficulty === d.value
                 ? "bg-primary text-on-primary border-primary"
                 : "bg-transparent text-on-surface-variant border-outline-variant hover:border-primary/50 hover:text-on-surface"
@@ -77,7 +77,7 @@ export function StartPracticeButton({
       <button
         onClick={handleClick}
         disabled={isPending}
-        className="px-8 py-3 font-label-lg text-label-lg bg-primary text-on-primary rounded-full disabled:opacity-50 transition-opacity"
+        className="px-8 py-3 font-label-lg text-label-lg bg-primary text-on-primary rounded-lg disabled:opacity-50 transition-opacity"
       >
         {isPending ? "Starting…" : "Practice now"}
       </button>
